@@ -5,6 +5,13 @@
 
 ## Unreleased
 
+## v1.3.0（2026-11-23）
+
+- 撮影で Apple Vision Pro（表示サイズ `APP_APPLE_VISION_PRO`、3840x2160）を撮れるようにした。プラットフォームは表示サイズの名前で決め、visionOS は `xrsimulator` の SDK と visionOS のランタイムで撮る（ランタイムが無ければ `xcodebuild -downloadPlatform visionOS` で入れる）。visionOS にはステータスバーと Dynamic Island が無いので、上書きも重ねもしない。iPhone・iPad の撮り方は変わらない
+- 撮影の plan の matrix に、撮る Simulator のプラットフォーム（`platform`）を足した
+- 撮れない表示サイズ（Mac・Apple TV・Apple Watch など）は、撮影の前に plan で止めるようにした（今までは撮影のジョブで Simulator を作れずに落ちていた）
+- 呼ぶ側の直しは要らない。visionOS のアプリ（template-app-visionos など）は、`.github/app-kit.json` の `unmanaged` から `.github/workflows/app-store-screenshots.yml` を外すと、撮影のワークフローが配られる
+
 ## v1.2.0（2026-11-23）
 
 - クリエイティブアセット（App Store のプロダクトページのヘッダー・検索結果の画像）を書き出す再利用ワークフロー `app-creative-assets.yml` と、呼ぶ側 `app-store-creative.yml` を足した。AskHub の司令塔が案（文言・色・使う画面）を入力で渡して起動し、artifact `creative-assets`・`creative-report` を取り込む。画像はリポジトリにコミットしない（ask-hub-apple の `docs/renewal/creative-assets.md`）
