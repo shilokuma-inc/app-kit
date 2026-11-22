@@ -206,7 +206,8 @@ jobs:
 
   merge:
     # 言語を分けて撮った表示サイズの part（中身は <言語>/<画面>.png で、言語は重ならない）を、司令塔が取り込む screenshots-<表示サイズ> にまとめ直す。
-    # 撮影のジョブが一部失敗しても、撮れた part だけでまとめる。ubuntu で動くので macOS の枠を使わない
+    # 撮影のジョブが一部失敗しても、撮れた part だけでまとめる。ubuntu で動くので macOS の枠を使わない。
+    # part は消さない（失敗したジョブだけを流し直したときに、撮れた part を失わないように。司令塔は名前が違う part を取り込まない）
     name: merge (${{ matrix.label }})
     needs: [plan, capture]
     if: ${{ !cancelled() && needs.plan.outputs.has_merge == 'true' }}
@@ -223,7 +224,6 @@ jobs:
         with:
           name: screenshots-${{ matrix.display_type }}
           pattern: screenshots-${{ matrix.display_type }}-part*
-          delete-merged: true
 
   derive:
     name: derive (${{ matrix.label }})
