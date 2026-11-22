@@ -1,0 +1,52 @@
+# app-kit 自身の確かめ。道具の確かめと、fixtures/App に対して再利用ワークフローを流す。
+# ルールセットで必須にするチェック（tools・build / build）が、ドキュメントだけの PR でも出るよう、paths で絞らない
+name: self-test
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tools:
+    name: tools
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test read-config.sh
+        run: bash tools/tests/test-read-config.sh
+
+      - name: ShellCheck
+        run: shellcheck tools/*.sh tools/tests/*.sh
+
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+
+      - name: Validate fixture configs
+        # fixtures の設定が、今の版の read-config.sh で読めること
+        run: |
+          for config in fixtures/*/.github/app-kit.json; do
+            echo "::group::$config"
+            tools/read-config.sh "$config"
+            echo "::endgroup::"
+          done
+
+  build:
+    # 同じリポジトリの再利用ワークフローを、確かめる版（PR の head）の道具で流す
+    uses: ./.github/workflows/app-build.yml
+    with:
+      app-kit-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      working-directory: fixtures/App
