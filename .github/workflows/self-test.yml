@@ -35,6 +35,16 @@ jobs:
       - name: actionlint
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
 
+      - name: Test manifest and managed files
+        run: bash tools/tests/test-manifest.sh "$RUNNER_TEMP/rendered"
+
+      - name: actionlint (managed workflows)
+        # 版を埋めた呼ぶ側のワークフローを確かめる
+        working-directory: ${{ runner.temp }}/rendered
+        run: |
+          mapfile -t workflows < <(ls .github/workflows/*.yml)
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color "${workflows[@]}"
+
       - name: Validate fixture screenshot configs
         # 撮影の再利用ワークフローの plan と同じ確かめ（撮るのは試しの 1 本のリポジトリで確かめる）
         run: |

@@ -1,0 +1,124 @@
+{
+  "v": 1,
+  "placeholders": {
+    "{{APP_KIT_REF}}": "版のコミット（40 桁）",
+    "{{APP_KIT_VERSION}}": "版のタグ（v1.0.0 など）"
+  },
+  "managed": [
+    ".coderabbit.yaml",
+    ".github/ISSUE_TEMPLATE/1-Feature.yaml",
+    ".github/ISSUE_TEMPLATE/2-Fix.yaml",
+    ".github/ISSUE_TEMPLATE/3-Refactor.yaml",
+    ".github/ISSUE_TEMPLATE/4-Chore.yaml",
+    ".github/ISSUE_TEMPLATE/5-BumpUp.yaml",
+    ".github/ISSUE_TEMPLATE/6-Docs.yaml",
+    ".github/ISSUE_TEMPLATE/config.yml",
+    ".github/pull_request_template.md",
+    ".github/workflows/app-store-screenshots.yml",
+    ".github/workflows/archive.yml",
+    ".github/workflows/build.yml",
+    ".github/workflows/upload.yml",
+    ".swiftlint.yml"
+  ],
+  "replaces": [
+    {
+      "path": ".github/workflows/_build.yml"
+    },
+    {
+      "path": ".github/workflows/_archive.yml"
+    },
+    {
+      "path": ".github/workflows/build-develop.yml"
+    },
+    {
+      "path": ".github/workflows/build-main.yml"
+    },
+    {
+      "path": ".github/workflows/build-working.yml"
+    },
+    {
+      "path": ".github/workflows/archive-main.yml"
+    },
+    {
+      "path": ".github/workflows/archive-working.yml"
+    },
+    {
+      "path": ".github/workflows/app-store-metadata.yml"
+    },
+    {
+      "path": ".github/workflows/verify-app-store-metadata.yml"
+    },
+    {
+      "path": ".github/workflows/close-goal-discussion.yml"
+    },
+    {
+      "path": ".github/workflows/cleanup-assets-branch.yml"
+    },
+    {
+      "path": ".github/scripts/app_store_connect.rb"
+    },
+    {
+      "path": ".github/scripts/check-app-store-app.rb"
+    },
+    {
+      "path": ".github/scripts/ensure-internal-testers.rb"
+    },
+    {
+      "path": "Tools/app_store_config.py",
+      "keepIfPresent": [
+        "Tools/upload_creative_assets.py",
+        ".github/workflows/app-store-creative-assets.yml"
+      ]
+    },
+    {
+      "path": "Tools/app_store_connect.py",
+      "keepIfPresent": [
+        "Tools/upload_creative_assets.py",
+        ".github/workflows/app-store-creative-assets.yml"
+      ]
+    },
+    {
+      "path": "Tools/capture_screenshots.sh"
+    },
+    {
+      "path": "Tools/derive_screenshots.py"
+    },
+    {
+      "path": "Tools/verify_screenshots.py"
+    },
+    {
+      "path": "Tools/remove_alpha.swift",
+      "keepIfPresent": [
+        "Tools/upload_creative_assets.py",
+        ".github/workflows/app-store-creative-assets.yml"
+      ]
+    },
+    {
+      "path": "Tools/overlay_screenshot.swift"
+    },
+    {
+      "path": "Tools/upload_metadata.py"
+    },
+    {
+      "path": "Tools/upload_screenshots.py"
+    },
+    {
+      "path": "Tools/upload_app_info.py"
+    },
+    {
+      "path": "scripts/ralph-kit.sh"
+    },
+    {
+      "path": "scripts/ralph-setup.sh"
+    },
+    {
+      "path": "scripts/ralph-start.sh"
+    },
+    {
+      "path": "scripts/ralph-stop.sh"
+    },
+    {
+      "path": "scripts/askhub-manual.sh"
+    }
+  ]
+}

@@ -16,11 +16,23 @@ AskHub で開発する Apple のアプリのリポジトリに、CI・リリー�
 | `tools/` | 再利用ワークフローが、呼ばれた版の app-kit を取り出して使う道具 |
 | `schema/` | 各リポジトリの設定（`.github/app-kit.json`）の形 |
 | `fixtures/` | 確かめ用の小さなアプリ |
+| `managed/` | 各リポジトリに写すファイル（置き場所と同じ並び）。呼ぶ側のワークフローは版を `{{APP_KIT_REF}}`・`{{APP_KIT_VERSION}}` の目印で持つ |
+| `manifest.json` | 写すファイルの一覧（`managed`）と、初めての入れ替えで外すファイル（`replaces`。`keepIfPresent` のファイルがあれば外さない） |
 
 ## 呼ぶ側
 
 版は、タグではなくコミット（40 桁）で固定する。同じコミットを `app-kit-ref` にも渡す（再利用ワークフローには、呼ばれた版を知る組み込みの値が無いため）。
 Secrets は名前を並べて渡す。`secrets: inherit` は、同じ organization か同じ enterprise の中でしか効かない。
+
+## 写すファイルを手で入れる
+
+AskHub の司令塔ができるまで（と、司令塔を通さずに試すとき）は、版を埋めたファイルを作って、アプリのリポジトリに置く。
+
+```bash
+tools/render-managed.sh <版のコミット> <版のタグ> <アプリのリポジトリ>
+```
+
+`.github/app-kit.json` は別に書く（形は `schema/app-kit.schema.json`）。`manifest.json` の `replaces` のファイルは外す（`keepIfPresent` のファイルがあれば残す）。
 
 ## 開発
 

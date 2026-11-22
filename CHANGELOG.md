@@ -9,3 +9,4 @@
 - 各リポジトリの設定 `.github/app-kit.json`（形は `schema/app-kit.schema.json`）と、読んで確かめる `tools/read-config.sh`
 - Archive・Upload の再利用ワークフロー `app-archive.yml`（iOS・visionOS。スタブのフレームワークの署名の直し・entitlements を入れて書き出した IPA で確かめる・TestFlight の内部テスター・`GoogleService-Info.plist` の書き出し）。書き出した IPA は artifact に上げない。macOS の Archive はまだ扱わない
 - スクショを撮るだけの再利用ワークフロー `app-store-screenshots.yml`（入力と artifact `screenshots-<表示サイズ>` は template-app-ios のものと同じ。App Store Connect には上げない。`upload: true` なら止める）
+- 写すファイル `managed/`（呼ぶ側の `build.yml`・`upload.yml`・`archive.yml`・`app-store-screenshots.yml`、`.swiftlint.yml`、`.coderabbit.yaml`、Issue・PR のテンプレート）と、写すファイル・初めての入れ替えで外すファイルの一覧 `manifest.json`。版を埋める `tools/render-managed.sh`

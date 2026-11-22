@@ -1,0 +1,15 @@
+# app-kit が配るファイル（shilokuma-inc/app-kit の managed/）。直すときは app-kit で直す。このリポジトリで直すと、次に版を上げたときに上書きされる
+name: 機能追加
+description: 機能追加のIssue
+title: "【FEAT】"
+labels: [enhancement]
+projects: []
+body:
+  - type: textarea
+    id: content
+    attributes:
+      label: 概要
+      description: 追加したい機能の説明をお願いします
+      placeholder: 〜機能を作成しました
+    validations:
+      required: true
