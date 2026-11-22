@@ -29,6 +29,10 @@ jobs:
       - name: Test read-config.sh
         run: bash tools/tests/test-read-config.sh
 
+      - name: Test screenshot matrix
+        # 撮影の plan が作る matrix（max_parallel と言語の分け方）
+        run: python3 tools/tests/test-screenshot-matrix.py
+
       - name: ShellCheck
         run: shellcheck tools/*.sh tools/tests/*.sh tools/screenshots/*.sh
 
@@ -61,6 +65,7 @@ jobs:
             APP_STORE_ROOT="$PWD/$app" python3 tools/screenshots/app_store_config.py languages "" > /dev/null
             APP_STORE_ROOT="$PWD/$app" python3 tools/screenshots/app_store_config.py scenes
             APP_STORE_ROOT="$PWD/$app" python3 tools/screenshots/app_store_config.py display-types "" | python3 -m json.tool
+            APP_STORE_ROOT="$PWD/$app" python3 tools/screenshots/app_store_config.py display-types "" --max-parallel 5 | python3 -m json.tool
             echo "::endgroup::"
           done
 
