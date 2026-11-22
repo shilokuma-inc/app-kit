@@ -39,8 +39,14 @@ LIMITS = {
     "search.title": 60,
     "search.chips": 30,
 }
-#: 1 つの文言に入れられる改行の数
-MAX_NEWLINES = 2
+#: 文言に入れられる改行の数（見出しと一文は 2 行・検索結果の見出しは 3 行まで。アプリ名とチップは 1 行）
+NEWLINES = {
+    "appName": 0,
+    "header.title": 1,
+    "header.subtitle": 1,
+    "search.title": 2,
+    "search.chips": 0,
+}
 
 #: Apple の決まりで入れられない文字（価格・URL・著作権の記号など）。見つけたら problems に出す
 FORBIDDEN = [
@@ -68,13 +74,13 @@ def _keys(value: dict, name: str, required: tuple[str, ...], optional: tuple[str
     _expect(not unknown, f"{name} に知らない欄があります: {', '.join(unknown)}")
 
 
-def _text(value: object, name: str, limit: int, *, allow_empty: bool = False) -> str:
+def _text(value: object, name: str, limit: int, newlines: int, *, allow_empty: bool = False) -> str:
     _expect(isinstance(value, str), f"{name} は文字列にしてください")
     text = value
     _expect(allow_empty or text.strip() != "", f"{name} が空です")
     _expect(len(text) <= limit, f"{name} が長すぎます（{len(text)} 文字。{limit} 文字まで）")
     _expect(not CONTROL.search(text), f"{name} に制御文字があります")
-    _expect(text.count("\n") <= MAX_NEWLINES, f"{name} の改行が多すぎます（{MAX_NEWLINES} つまで）")
+    _expect(text.count("\n") <= newlines, f"{name} の改行が多すぎます（{newlines} つまで）")
     _expect(text.count("*") % 2 == 0, f"{name} の強調の * が閉じていません")
     return text
 
@@ -126,23 +132,23 @@ def validate(spec: object) -> list[dict]:
         seen.add(code)
         folder = locale["screenshots"]
         _expect(isinstance(folder, str) and FOLDER.match(folder) is not None, f"{code} の screenshots が不正です: {folder!r}")
-        texts.append((f"{code}.appName", _text(locale["appName"], f"{code}.appName", LIMITS["appName"])))
+        texts.append((f"{code}.appName", _text(locale["appName"], f"{code}.appName", LIMITS["appName"], NEWLINES["appName"])))
 
         header = locale["header"]
         _keys(header, f"{code}.header", ("title",), ("subtitle",))
-        texts.append((f"{code}.header.title", _text(header["title"], f"{code}.header.title", LIMITS["header.title"])))
+        texts.append((f"{code}.header.title", _text(header["title"], f"{code}.header.title", LIMITS["header.title"], NEWLINES["header.title"])))
         if "subtitle" in header:
             texts.append((f"{code}.header.subtitle",
-                          _text(header["subtitle"], f"{code}.header.subtitle", LIMITS["header.subtitle"], allow_empty=True)))
+                          _text(header["subtitle"], f"{code}.header.subtitle", LIMITS["header.subtitle"], NEWLINES["header.subtitle"], allow_empty=True)))
 
         search = locale["search"]
         _keys(search, f"{code}.search", ("title",), ("chips",))
-        texts.append((f"{code}.search.title", _text(search["title"], f"{code}.search.title", LIMITS["search.title"])))
+        texts.append((f"{code}.search.title", _text(search["title"], f"{code}.search.title", LIMITS["search.title"], NEWLINES["search.title"])))
         chips = search.get("chips", [])
         _expect(isinstance(chips, list) and len(chips) <= 3, f"{code}.search.chips は 3 つまでにしてください")
         for chip_index, chip in enumerate(chips):
             label = f"{code}.search.chips[{chip_index}]"
-            texts.append((label, _text(chip, label, LIMITS["search.chips"])))
+            texts.append((label, _text(chip, label, LIMITS["search.chips"], NEWLINES["search.chips"])))
 
     problems = []
     for label, text in texts:
