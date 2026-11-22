@@ -67,6 +67,9 @@ class ValidateTests(unittest.TestCase):
             (lambda s: s["locales"][0]["header"].update(title="*強調"), "閉じていません"),
             (lambda s: s["locales"][0]["search"].update(chips=["a", "b", "c", "d"]), "3 つまで"),
             (lambda s: s["locales"][0].update(appName=3), "文字列"),
+            (lambda s: s.update(layout=["standard"]), "layout"),
+            (lambda s: s["screens"].update(header=["01_home\n"]), "画面の名前が不正"),
+            (lambda s: s["colors"].update(text="#FFFFFF\n"), "#RRGGBB"),
         ]
         for change, message in cases:
             with self.subTest(message=message):
@@ -86,6 +89,22 @@ class ValidateTests(unittest.TestCase):
         spec = sample()
         spec["locales"][0]["search"]["title"] = "ずっと無料で使える"
         self.assertEqual([problem["code"] for problem in validate(spec)], ["forbidden-price"])
+
+    def test_reports_forbidden_text_hidden_by_emphasis(self) -> None:
+        spec = sample()
+        spec["locales"][1]["header"]["title"] = "*Fr*ee notes"
+        spec["locales"][0]["header"]["title"] = "無*料*で記録"
+        self.assertEqual([problem["code"] for problem in validate(spec)], ["forbidden-price", "forbidden-price"])
+
+    def test_app_name_keeps_asterisks(self) -> None:
+        spec = sample()
+        spec["locales"][1]["appName"] = "Q*bert"
+        self.assertEqual(validate(spec), [])
+
+    def test_reports_low_contrast_of_highlight(self) -> None:
+        spec = sample()
+        spec["colors"]["highlight"] = "#0C1128"
+        self.assertEqual({problem["code"] for problem in validate(spec)}, {"low-contrast"})
 
     def test_reports_low_contrast(self) -> None:
         spec = sample()

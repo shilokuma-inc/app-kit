@@ -74,14 +74,14 @@ def _keys(value: dict, name: str, required: tuple[str, ...], optional: tuple[str
     _expect(not unknown, f"{name} に知らない欄があります: {', '.join(unknown)}")
 
 
-def _text(value: object, name: str, limit: int, newlines: int, *, allow_empty: bool = False) -> str:
+def _text(value: object, name: str, limit: int, newlines: int, *, allow_empty: bool = False, emphasis: bool = True) -> str:
     _expect(isinstance(value, str), f"{name} は文字列にしてください")
     text = value
     _expect(allow_empty or text.strip() != "", f"{name} が空です")
     _expect(len(text) <= limit, f"{name} が長すぎます（{len(text)} 文字。{limit} 文字まで）")
     _expect(not CONTROL.search(text), f"{name} に制御文字があります")
     _expect(text.count("\n") <= newlines, f"{name} の改行が多すぎます（{newlines} つまで）")
-    _expect(text.count("*") % 2 == 0, f"{name} の強調の * が閉じていません")
+    _expect(not emphasis or text.count("*") % 2 == 0, f"{name} の強調の * が閉じていません")
     return text
 
 
@@ -104,12 +104,12 @@ def validate(spec: object) -> list[dict]:
     """案を確かめる。形の誤りは SpecError、書き出せる問題は problems（[{code, message}]）で返す"""
     _keys(spec, "案", ("v", "layout", "colors", "screens", "locales"))
     _expect(spec["v"] == 1, f"案の v は 1 にしてください（{spec['v']!r}）")
-    _expect(spec["layout"] in LAYOUTS, f"layout は {', '.join(sorted(LAYOUTS))} のどれかにしてください")
+    _expect(isinstance(spec["layout"], str) and spec["layout"] in LAYOUTS, f"layout は {', '.join(sorted(LAYOUTS))} のどれかにしてください")
 
     colors = spec["colors"]
     _keys(colors, "colors", REQUIRED_COLORS, OPTIONAL_COLORS)
     for key, value in colors.items():
-        _expect(isinstance(value, str) and COLOR.match(value) is not None, f"colors.{key} は #RRGGBB にしてください")
+        _expect(isinstance(value, str) and COLOR.fullmatch(value) is not None, f"colors.{key} は #RRGGBB にしてください")
 
     screens = spec["screens"]
     _keys(screens, "screens", ("header", "search"))
@@ -117,7 +117,7 @@ def validate(spec: object) -> list[dict]:
         names = screens[key]
         _expect(isinstance(names, list) and 1 <= len(names) <= most, f"screens.{key} は 1〜{most} 個の画面にしてください")
         for name in names:
-            _expect(isinstance(name, str) and SCREEN.match(name) is not None, f"screens.{key} の画面の名前が不正です: {name!r}")
+            _expect(isinstance(name, str) and SCREEN.fullmatch(name) is not None, f"screens.{key} の画面の名前が不正です: {name!r}")
 
     locales = spec["locales"]
     _expect(isinstance(locales, list) and 1 <= len(locales) <= MAX_LOCALES, f"locales は 1〜{MAX_LOCALES} 個にしてください")
@@ -127,12 +127,12 @@ def validate(spec: object) -> list[dict]:
         name = f"locales[{index}]"
         _keys(locale, name, ("locale", "screenshots", "appName", "header", "search"))
         code = locale["locale"]
-        _expect(isinstance(code, str) and LOCALE.match(code) is not None, f"{name}.locale が不正です: {code!r}")
+        _expect(isinstance(code, str) and LOCALE.fullmatch(code) is not None, f"{name}.locale が不正です: {code!r}")
         _expect(code not in seen, f"言語 {code} が重なっています")
         seen.add(code)
         folder = locale["screenshots"]
-        _expect(isinstance(folder, str) and FOLDER.match(folder) is not None, f"{code} の screenshots が不正です: {folder!r}")
-        texts.append((f"{code}.appName", _text(locale["appName"], f"{code}.appName", LIMITS["appName"], NEWLINES["appName"])))
+        _expect(isinstance(folder, str) and FOLDER.fullmatch(folder) is not None, f"{code} の screenshots が不正です: {folder!r}")
+        texts.append((f"{code}.appName", _text(locale["appName"], f"{code}.appName", LIMITS["appName"], NEWLINES["appName"], emphasis=False)))
 
         header = locale["header"]
         _keys(header, f"{code}.header", ("title",), ("subtitle",))
@@ -152,13 +152,20 @@ def validate(spec: object) -> list[dict]:
 
     problems = []
     for label, text in texts:
+        # 強調の * は画像に出ないので、除いた文字で確かめる（アプリ名は * をそのまま描く）
+        shown = text if label.endswith(".appName") else text.replace("*", "")
         for code, pattern, what in FORBIDDEN:
-            if pattern.search(text):
+            if pattern.search(shown):
                 problems.append({"code": f"forbidden-{code}", "message": f"{label} に{what}らしい文字があります（App Store の決まりで入れられません）"})
-    for background in {colors["background"], colors.get("background2", colors["background"])}:
-        ratio = contrast(colors["text"], background)
-        if ratio < 4.5:
-            problems.append({"code": "low-contrast", "message": f"文字の色と背景の色 {background} のコントラストが {ratio:.1f} で、4.5 より低いです"})
+    highlight = colors.get("highlight", colors["accent"])
+    for background in sorted({colors["background"], colors.get("background2", colors["background"])}):
+        for name, color in (("文字", colors["text"]), ("強調とアプリ名", highlight)):
+            ratio = contrast(color, background)
+            if ratio < 4.5:
+                problems.append({
+                    "code": "low-contrast",
+                    "message": f"{name}の色 {color} と背景の色 {background} のコントラストが {ratio:.1f} で、4.5 より低いです",
+                })
     return problems
 
 
