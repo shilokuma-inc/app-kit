@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# App Store 用のスクリーンショットを、1 つの表示サイズについて全言語・全画面ぶん撮る（iOS / iPadOS）。
+# App Store 用のスクリーンショットを、1 つの表示サイズについて全言語・全画面ぶん撮る（iOS / iPadOS / visionOS）。
 #
 #   tools/screenshots/capture_screenshots.sh APP_IPHONE_67 [ja,en]
+#   tools/screenshots/capture_screenshots.sh APP_APPLE_VISION_PRO [ja,en]
 #
 # アプリのリポジトリのルートで実行する。撮る画面と機種は AppStore/screenshots.json、言語は
 # AppStore/languages.json、プロジェクトと Scheme は AppStore/app.json で決める。
@@ -20,6 +21,7 @@ set -euo pipefail
 # Xcode は表示サイズの xcodeVersion（AppStore/screenshots.json）のものを使う。今の Xcode（DEVELOPER_DIR か xcode-select）が
 # 違えば /Applications から探して DEVELOPER_DIR に入れる。CI ではワークフローが選んだ Xcode が合っているかを確かめるだけにする。
 # どこで撮っても同じ画像になるよう、Simulator の言語は英語にし、iPhone の Dynamic Island は手元でも写す（理由はそれぞれの箇所）。
+# Simulator のプラットフォーム（iOS / visionOS）は表示サイズの名前で決まる（app_store_config.py の platform）。
 
 DISPLAY_TYPE="${1:?表示サイズ（例: APP_IPHONE_67）を指定してください}"
 LANGUAGES="${2:-}"
@@ -69,19 +71,37 @@ fi
 
 # MARK: - Simulator
 
-SDK_VERSION="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+# ビルドする SDK と Simulator のランタイム（visionOS のランタイムの ID は xrOS）
+PLATFORM="$($CONFIG platform "$DISPLAY_TYPE")"
+case "$PLATFORM" in
+    iOS)
+        SIMULATOR_SDK=iphonesimulator
+        RUNTIME_KEY=SimRuntime.iOS
+        ;;
+    visionOS)
+        SIMULATOR_SDK=xrsimulator
+        RUNTIME_KEY=SimRuntime.xrOS
+        ;;
+    *)
+        echo "$DISPLAY_TYPE のプラットフォーム（${PLATFORM}）は撮れません" >&2
+        exit 1
+        ;;
+esac
+
+SDK_VERSION="$(xcrun --sdk "$SIMULATOR_SDK" --show-sdk-version)"
 
 # ビルドに使う SDK より新しいランタイム（ベータなど）には入れられないので、SDK 以下で一番新しいものを使う。
 # 機種（デバイスタイプの ID）を渡すと、その機種に対応したランタイムに絞る
 # （iPhone Duo だけに対応するランタイムのように、新しいランタイムが既存の機種に対応しないことがある）
-latest_ios_runtime() {
+latest_runtime() {
     xcrun simctl list -j runtimes | python3 -c "
 import json, sys
-sdk = [int(part) for part in sys.argv[1].split('.')]
-device_type = sys.argv[2] if len(sys.argv) > 2 else ''
+key = sys.argv[1]
+sdk = [int(part) for part in sys.argv[2].split('.')]
+device_type = sys.argv[3] if len(sys.argv) > 3 else ''
 runtimes = [
     r for r in json.load(sys.stdin).get('runtimes', [])
-    if r.get('isAvailable') and 'SimRuntime.iOS' in r.get('identifier', '')
+    if r.get('isAvailable') and key in r.get('identifier', '')
     and [int(part) for part in r['version'].split('.')][:2] <= sdk[:2]
     and (not device_type or device_type in [d.get('identifier') for d in r.get('supportedDeviceTypes', [])])
 ]
@@ -89,7 +109,7 @@ if not runtimes:
     sys.exit(1)
 latest = max(runtimes, key=lambda r: [int(part) for part in r['version'].split('.')])
 print(latest['identifier'])
-" "$SDK_VERSION" "$@"
+" "$RUNTIME_KEY" "$SDK_VERSION" "$@"
 }
 
 device_type_id_for_name() {
@@ -103,16 +123,16 @@ sys.exit(1)
 " "$1"
 }
 
-if ! RUNTIME_ID="$(latest_ios_runtime)"; then
-    echo "iOS Simulator のランタイムが見つからないためダウンロードします"
-    xcodebuild -downloadPlatform iOS
-    RUNTIME_ID="$(latest_ios_runtime)"
+if ! RUNTIME_ID="$(latest_runtime)"; then
+    echo "${PLATFORM} Simulator のランタイムが見つからないためダウンロードします"
+    xcodebuild -downloadPlatform "$PLATFORM"
+    RUNTIME_ID="$(latest_runtime)"
 fi
 UDID=""
 DEVICE_NAME=""
 while IFS= read -r -u 3 candidate; do
     if DEVICE_TYPE_ID="$(device_type_id_for_name "$candidate")" \
-        && DEVICE_RUNTIME_ID="$(latest_ios_runtime "$DEVICE_TYPE_ID")" \
+        && DEVICE_RUNTIME_ID="$(latest_runtime "$DEVICE_TYPE_ID")" \
         && UDID="$(xcrun simctl create "${SIMULATOR_PREFIX}-Screenshot-${DISPLAY_TYPE}" "$DEVICE_TYPE_ID" "$DEVICE_RUNTIME_ID" 2>/dev/null)"; then
         DEVICE_NAME="$candidate"
         RUNTIME_ID="$DEVICE_RUNTIME_ID"
@@ -181,7 +201,7 @@ xcodebuild build \
     -project "$PROJECT" \
     -scheme "$SCHEME" \
     -configuration "$CONFIGURATION" \
-    -destination "platform=iOS Simulator,id=$UDID" \
+    -destination "platform=${PLATFORM} Simulator,id=$UDID" \
     -derivedDataPath "$DERIVED_DATA" \
     ${PLUGIN_OPTIONS[@]+"${PLUGIN_OPTIONS[@]}"} \
     -quiet \
@@ -191,7 +211,7 @@ SETTINGS="$(xcodebuild -showBuildSettings \
     -project "$PROJECT" \
     -scheme "$SCHEME" \
     -configuration "$CONFIGURATION" \
-    -destination "platform=iOS Simulator,id=$UDID" \
+    -destination "platform=${PLATFORM} Simulator,id=$UDID" \
     -derivedDataPath "$DERIVED_DATA")"
 BUILT_DIR="$(printf '%s\n' "$SETTINGS" | awk -F' = ' '/ BUILT_PRODUCTS_DIR /{print $2; exit}')"
 APP_NAME="$(printf '%s\n' "$SETTINGS" | awk -F' = ' '/ FULL_PRODUCT_NAME /{print $2; exit}')"
@@ -201,19 +221,21 @@ BUNDLE_ID="$(printf '%s\n' "$SETTINGS" | awk -F' = ' '/ PRODUCT_BUNDLE_IDENTIFIE
 xcrun simctl boot "$UDID"
 xcrun simctl bootstatus "$UDID" -b >/dev/null
 
-# App Store のスクリーンショットらしく、上端を整える。
+# App Store のスクリーンショットらしく、上端を整える（visionOS にはステータスバーが無いので、上書きしない）。
 # 日付は固定しない（iPad は時刻の横に撮った日の日付が出る）。--time に ISO の日時を渡すと、手元の Mac（Xcode 27 を入れた Mac）では
 # 日付も固定できるが曜日と月が英語になり、CI の macOS ランナーでは日付だけが黙って無視される（2026-11 に確かめた）
-xcrun simctl status_bar "$UDID" override \
-    --time "9:41" \
-    --dataNetwork wifi \
-    --wifiMode active \
-    --wifiBars 3 \
-    --cellularMode active \
-    --cellularBars 4 \
-    --batteryState charged \
-    --batteryLevel 100 \
-    --operatorName ""
+if [ "$PLATFORM" = iOS ]; then
+    xcrun simctl status_bar "$UDID" override \
+        --time "9:41" \
+        --dataNetwork wifi \
+        --wifiMode active \
+        --wifiBars 3 \
+        --cellularMode active \
+        --cellularBars 4 \
+        --batteryState charged \
+        --batteryLevel 100 \
+        --operatorName ""
+fi
 
 # iPhone Duo のように画面が 2 つある機種では、どちらの画面を撮るかが起動のたびに変わる（内側は真っ黒に写る）。
 # screenshots.json の sizes の先頭と同じ寸法の画面を選んで撮る。見つからなければ simctl の既定の画面を撮る
@@ -253,22 +275,25 @@ screenshot_with_mask() {
 # 手元の Mac の Simulator には描かれず、--mask=alpha で撮ったときだけ黒で描かれる（2026-11 に確かめた）。
 # --mask=alpha の画像は画面の四隅も透明になり、iPhone Duo の外側の画面ではカメラの穴（CI の画像には写らない）も黒く写るので、
 # マスク無しの画像の上に、上端の中央（Dynamic Island の場所）だけを重ねる（tools/screenshots/overlay_screenshot.swift）。
-# 重ねても変わらないとき（Dynamic Island の無い iPad・iPhone Duo と、もともと写っている CI）は、撮るたびに重ねるのを省く
+# 重ねても変わらないとき（Dynamic Island の無い iPad・iPhone Duo と、もともと写っている CI）は、撮るたびに重ねるのを省く。
+# visionOS は Dynamic Island が無いので、確かめずに重ねない
 BIN_DIR="$(mktemp -d)"
-OVERLAY="$BIN_DIR/overlay_screenshot"
-xcrun swiftc -O "$TOOLS_DIR/overlay_screenshot.swift" -o "$OVERLAY"
-screenshot "$BIN_DIR/plain.png"
-screenshot_with_mask "$BIN_DIR/masked.png"
-# 重ねて変わった画素の数。if の条件の中で直接呼ぶと、ツールが失敗しても止まらずに「重ねない」になるので、先に受け取る
-CHANGED_PIXELS="$("$OVERLAY" "$BIN_DIR/plain.png" "$BIN_DIR/masked.png" "$BIN_DIR/merged.png")"
 ADD_DYNAMIC_ISLAND=0
-if [ "$CHANGED_PIXELS" -gt 0 ]; then
-    ADD_DYNAMIC_ISLAND=1
+if [ "$PLATFORM" = iOS ]; then
+    OVERLAY="$BIN_DIR/overlay_screenshot"
+    xcrun swiftc -O "$TOOLS_DIR/overlay_screenshot.swift" -o "$OVERLAY"
+    screenshot "$BIN_DIR/plain.png"
+    screenshot_with_mask "$BIN_DIR/masked.png"
+    # 重ねて変わった画素の数。if の条件の中で直接呼ぶと、ツールが失敗しても止まらずに「重ねない」になるので、先に受け取る
+    CHANGED_PIXELS="$("$OVERLAY" "$BIN_DIR/plain.png" "$BIN_DIR/masked.png" "$BIN_DIR/merged.png")"
+    if [ "$CHANGED_PIXELS" -gt 0 ]; then
+        ADD_DYNAMIC_ISLAND=1
+    fi
+    echo "Dynamic Island を重ねる: $([ "$ADD_DYNAMIC_ISLAND" = 1 ] && echo はい || echo いいえ（重ねても変わらない）)"
 fi
-echo "Dynamic Island を重ねる: $([ "$ADD_DYNAMIC_ISLAND" = 1 ] && echo はい || echo いいえ（重ねても変わらない）)"
 
 # 起動直後はシートが出てくる途中だったりするので、連続で撮った 2 枚が同じになるまで待つ。
-# 時刻はステータスバーで固定しているので、アニメーションが終われば画面は変わらない
+# 時刻はステータスバーで固定している（visionOS には時刻の表示が無い）ので、アニメーションが終われば画面は変わらない
 capture_when_settled() {
     output="$1"
     work="$(mktemp -d)"
