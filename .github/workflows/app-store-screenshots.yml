@@ -3,6 +3,8 @@
 # App Store Connect に上げるのは、人が確かめた後の司令塔だけ（app-kit では上げない）。
 #
 # 撮る画面と機種は呼んだ側の AppStore/screenshots.json、言語は AppStore/languages.json、プロジェクトと Scheme は AppStore/app.json で決める。
+# 同時に使う macOS ランナーの数は max_parallel（既定 1 = 1 本ずつ）。司令塔が、同じ owner のほかの撮影や時間帯を見て決める。
+# 撮る表示サイズの数より多ければ、余った枠のぶん言語を分けて撮り、merge のジョブが screenshots-<表示サイズ> にまとめ直す。
 # 起動の条件（workflow_dispatch の入力）と concurrency は、呼ぶ側のワークフローに書く。Secrets は受け取らない。
 name: app-store-screenshots
 
@@ -21,6 +23,10 @@ on:
         description: 撮る言語（カンマ区切り）。空なら languages.json のすべて
         type: string
         default: ''
+      max_parallel:
+        description: 撮影に同時に使う macOS ランナーの数（1〜5）。撮る表示サイズの数より多ければ、余った枠のぶん言語を分けて撮る
+        type: number
+        default: 1
       allow_non_release:
         description: release/** 以外のブランチでも撮る（撮影の仕組みを確かめるときだけ）
         type: boolean
@@ -49,9 +55,14 @@ jobs:
       capture: ${{ steps.matrix.outputs.capture }}
       derive: ${{ steps.matrix.outputs.derive }}
       has_derive: ${{ steps.matrix.outputs.has_derive }}
+      merge: ${{ steps.matrix.outputs.merge }}
+      has_merge: ${{ steps.matrix.outputs.has_merge }}
+      max_parallel: ${{ steps.matrix.outputs.max_parallel }}
 
     steps:
       - name: Check inputs
+        # checkout の前なので、working-directory（アプリのディレクトリ）はまだ無い。作業場所の直下で動かす
+        working-directory: .
         env:
           REF: ${{ github.ref }}
           ALLOW_NON_RELEASE: ${{ inputs.allow_non_release }}
@@ -91,18 +102,26 @@ jobs:
         env:
           DISPLAY_TYPES: ${{ inputs.display_types }}
           LANGUAGES: ${{ inputs.languages }}
+          MAX_PARALLEL: ${{ inputs.max_parallel }}
         run: |
           set -euo pipefail
           export APP_STORE_ROOT="$PWD"
           config="$APP_KIT_DIR/tools/screenshots/app_store_config.py"
+          if [[ ! "$MAX_PARALLEL" =~ ^[0-9]+$ ]]; then
+            echo "::error::max_parallel は 1〜5 の整数にしてください: $MAX_PARALLEL"
+            exit 1
+          fi
           python3 "$config" languages "$LANGUAGES" > /dev/null
           python3 "$config" scenes > /dev/null
-          matrix="$(python3 "$config" display-types "$DISPLAY_TYPES")"
+          matrix="$(python3 "$config" display-types "$DISPLAY_TYPES" --max-parallel "$MAX_PARALLEL" --languages "$LANGUAGES")"
           echo "$matrix" | python3 -m json.tool
           {
             echo "capture=$(jq -c .capture <<<"$matrix")"
             echo "derive=$(jq -c .derive <<<"$matrix")"
             echo "has_derive=$(jq -r '.derive | length > 0' <<<"$matrix")"
+            echo "merge=$(jq -c .merge <<<"$matrix")"
+            echo "has_merge=$(jq -r '.merge | length > 0' <<<"$matrix")"
+            echo "max_parallel=$(jq -r .max_parallel <<<"$matrix")"
           } >> "$GITHUB_OUTPUT"
 
   capture:
@@ -112,8 +131,8 @@ jobs:
     runs-on: ${{ matrix.runs_on }}
     timeout-minutes: 90
     strategy:
-      # 1 本ずつ撮る。片方のサイズが失敗しても、残りは撮り切る
-      max-parallel: 1
+      # 同時に max_parallel 本まで撮る（plan がジョブの数を max_parallel 以下にする）。どれかが失敗しても、残りは撮り切る
+      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
       fail-fast: false
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.capture) }}
@@ -164,7 +183,8 @@ jobs:
       - name: Capture screenshots
         env:
           DISPLAY_TYPE: ${{ matrix.display_type }}
-          LANGUAGES: ${{ inputs.languages }}
+          # 言語を分けたジョブは、その組の言語だけを撮る（分けないときは入力のまま）
+          LANGUAGES: ${{ matrix.languages }}
           SKIP_PACKAGE_PLUGIN_VALIDATION: '1'
           # xcode-27 のランナー（iPhone Duo）は起動直後の負荷が高く、既定の待ちでは 1 枚目が起動画面のまま撮れた。
           # ほかのサイズも数十秒延びるだけなので、すべてのサイズで同じにする
@@ -175,17 +195,40 @@ jobs:
           "$APP_KIT_DIR/tools/screenshots/capture_screenshots.sh" "$DISPLAY_TYPE" "$LANGUAGES"
 
       - name: Upload screenshots as artifact
-        # 途中で失敗したときも撮れたぶんは残す（司令塔は撮れた表示サイズだけ取り込む）
+        # 途中で失敗したときも撮れたぶんは残す（司令塔は撮れた表示サイズだけ取り込む）。
+        # 言語を分けたジョブは screenshots-<表示サイズ>-part<n> に上げ、merge のジョブがまとめ直す
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: screenshots-${{ matrix.display_type }}
+          name: ${{ matrix.artifact }}
           path: ${{ inputs.working-directory }}/${{ env.SCREENSHOTS_DIR }}/${{ matrix.display_type }}
           if-no-files-found: warn
 
+  merge:
+    # 言語を分けて撮った表示サイズの part（中身は <言語>/<画面>.png で、言語は重ならない）を、司令塔が取り込む screenshots-<表示サイズ> にまとめ直す。
+    # 撮影のジョブが一部失敗しても、撮れた part だけでまとめる。ubuntu で動くので macOS の枠を使わない。
+    # part は消さない（失敗したジョブだけを流し直したときに、撮れた part を失わないように。司令塔は名前が違う part を取り込まない）
+    name: merge (${{ matrix.label }})
+    needs: [plan, capture]
+    if: ${{ !cancelled() && needs.plan.outputs.has_merge == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.merge) }}
+
+    steps:
+      - name: Merge screenshots
+        uses: actions/upload-artifact/merge@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots-${{ matrix.display_type }}
+          pattern: screenshots-${{ matrix.display_type }}-part*
+
   derive:
     name: derive (${{ matrix.label }})
-    needs: [plan, capture]
+    # 元の表示サイズを言語で分けて撮ったときは、merge でまとめ直した後に縮める（分けないときは merge が飛ばされ、撮影の後に動く）
+    needs: [plan, capture, merge]
     if: ${{ !cancelled() && needs.plan.outputs.has_derive == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

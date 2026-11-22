@@ -21,6 +21,7 @@
     python3 tools/screenshots/app_store_config.py xcode-version APP_IPHONE_67  # 撮影に使う Xcode の版
     python3 tools/screenshots/app_store_config.py developer-dir APP_IPHONE_67  # その版の Xcode の DEVELOPER_DIR（--selected-only で今の Xcode だけを見る）
     python3 tools/screenshots/app_store_config.py display-types [APP_IPHONE_67,...]  # GitHub Actions の matrix 用 JSON
+    python3 tools/screenshots/app_store_config.py display-types "" --max-parallel 3 --languages ja,en  # 同時に 3 本まで使う matrix
     python3 tools/screenshots/app_store_config.py bundle-id
 """
 
@@ -43,6 +44,10 @@ SCREENSHOTS_FILE = ROOT / "AppStore" / "screenshots.json"
 
 #: 1 つの言語・表示サイズに載せられる枚数の上限（App Store Connect の制限）
 MAX_SCREENSHOTS = 10
+
+#: 撮影で同時に使う macOS ランナーの数（max_parallel）の範囲。上は GitHub の Free の macOS の同時実行（owner ごと）
+MIN_PARALLEL = 1
+MAX_PARALLEL = 5
 
 #: screenshots.json の表示サイズで runsOn / xcodeVersion を省いたときの既定
 DEFAULT_RUNS_ON = "macos-latest"
@@ -211,11 +216,52 @@ def display_type_names(selected: list[str] | None = None) -> list[str]:
     return names
 
 
-def matrix(selected: list[str] | None = None) -> dict:
+def language_parts(codes: list[str], parts: int) -> list[list[str]]:
+    """言語を、指定の順のまま先頭から parts 個に区切る。なるべく同じ数にし、割り切れないぶんは先頭の組に 1 つずつ足す。"""
+    size, extra = divmod(len(codes), parts)
+    result: list[list[str]] = []
+    start = 0
+    for index in range(parts):
+        end = start + size + (1 if index < extra else 0)
+        result.append(codes[start:end])
+        start = end
+    return result
+
+
+def capture_parts(capture: list[str], language_count: int, max_parallel: int) -> dict[str, int]:
+    """撮る表示サイズごとの、言語を分ける数。撮影のジョブの数が max_parallel を超えないようにする。
+
+    max_parallel が撮る表示サイズの数以下なら分けない。余った枠は screenshots.json に書いた順に 1 つずつ配り、
+    配った表示サイズの言語をもう 1 つ分ける（言語の数より多くは分けない）。入力の順で配ると、司令塔が名前の順に並べて送るため、
+    書いた順（template は時間のかかる iPhone Duo が先頭）で配る。
+    """
+    parts = {name: 1 for name in capture}
+    order = list(_screenshots_config()["displayTypes"])
+    ranked = sorted(capture, key=order.index)
+    spare = max_parallel - len(capture)
+    while spare > 0:
+        splittable = [name for name in ranked if parts[name] < language_count]
+        if not splittable:
+            break
+        for name in splittable[:spare]:
+            parts[name] += 1
+        spare -= min(spare, len(splittable))
+    return parts
+
+
+def matrix(
+    selected: list[str] | None = None,
+    max_parallel: int = 1,
+    selected_languages: list[str] | None = None,
+) -> dict:
     """GitHub Actions の matrix。撮る表示サイズ（capture）と、縮めて作る表示サイズ（derive）に分ける。
 
     縮めて作る表示サイズだけを指定したときも、元の表示サイズは撮る必要があるので capture に足す。
+    max_parallel が撮る表示サイズの数より多ければ、余った枠のぶん言語を分けて撮る（capture_parts）。分けた表示サイズは
+    artifact を screenshots-<表示サイズ>-part<n> に上げ、merge のジョブが screenshots-<表示サイズ> にまとめ直す。
     """
+    if not MIN_PARALLEL <= max_parallel <= MAX_PARALLEL:
+        raise SystemExit(f"max_parallel は {MIN_PARALLEL}〜{MAX_PARALLEL} にしてください: {max_parallel}")
     # 同じ表示サイズを重ねて指定されても、ジョブ（と同じ名前の artifact）を 2 つ作らないよう、指定の順のまま重なりを除く
     names = list(dict.fromkeys(display_type_names(selected)))
     capture: list[str] = []
@@ -228,18 +274,37 @@ def matrix(selected: list[str] | None = None) -> dict:
                 capture.append(entry["deriveFrom"])
         elif name not in capture:
             capture.append(name)
+    codes = [language.language for language in languages(selected_languages)]
+    parts = capture_parts(capture, len(codes), max_parallel)
     capture_entries = []
+    merge: list[dict] = []
     for name in capture:
         entry = display_type(name)
-        capture_entries.append({
+        job = {
             "display_type": name,
-            "label": entry["label"],
             "runs_on": entry.get("runsOn") or DEFAULT_RUNS_ON,
             "xcode_version": xcode_version(name),
-        })
+        }
+        if parts[name] == 1:
+            # 分けないときは今までと同じ（言語は入力のまま。空ならすべて）
+            capture_entries.append({
+                **job,
+                "label": entry["label"],
+                "languages": ",".join(selected_languages or []),
+                "artifact": f"screenshots-{name}",
+            })
+            continue
+        for index, group in enumerate(language_parts(codes, parts[name]), start=1):
+            capture_entries.append({
+                **job,
+                "label": f"{entry['label']} {index}/{parts[name]}",
+                "languages": ",".join(group),
+                "artifact": f"screenshots-{name}-part{index}",
+            })
+        merge.append({"display_type": name, "label": entry["label"]})
     # 反映は、指定された表示サイズだけ（元にするために撮っただけのものは反映しない）
     upload = [{"display_type": name, "label": display_type(name)["label"]} for name in names]
-    return {"capture": capture_entries, "derive": derive, "upload": upload}
+    return {"capture": capture_entries, "derive": derive, "merge": merge, "upload": upload, "max_parallel": max_parallel}
 
 
 # MARK: - Xcode
@@ -447,6 +512,11 @@ def main() -> int:
     )
     parser.add_argument("argument", nargs="?", default=None)
     parser.add_argument("--selected-only", action="store_true", help="developer-dir で、今の Xcode が合うかだけを確かめる")
+    parser.add_argument(
+        "--max-parallel", type=int, default=MIN_PARALLEL,
+        help=f"display-types で、撮影に同時に使う macOS ランナーの数（{MIN_PARALLEL}〜{MAX_PARALLEL}）。表示サイズの数より多ければ言語を分ける",
+    )
+    parser.add_argument("--languages", default=None, help="display-types で、撮る言語（カンマ区切り。省略・空ならすべて）")
     args = parser.parse_args()
 
     if args.command == "app":
@@ -478,7 +548,10 @@ def main() -> int:
     elif args.command == "bundle-id":
         print(bundle_id())
     else:
-        print(json.dumps(matrix(parse_list(args.argument)), ensure_ascii=False))
+        print(json.dumps(
+            matrix(parse_list(args.argument), max_parallel=args.max_parallel, selected_languages=parse_list(args.languages)),
+            ensure_ascii=False,
+        ))
     return 0
 
 
