@@ -45,8 +45,9 @@ jobs:
           done
 
   build:
-    # 同じリポジトリの再利用ワークフローを、確かめる版（PR の head）の道具で流す
+    # 同じリポジトリの再利用ワークフローを、同じ版の道具で流す。PR では、ローカルの再利用ワークフローと checkout が
+    # merge commit を使うので、道具も github.sha（PR では merge commit、push では push したコミット）にそろえる
     uses: ./.github/workflows/app-build.yml
     with:
-      app-kit-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      app-kit-ref: ${{ github.sha }}
       working-directory: fixtures/App
