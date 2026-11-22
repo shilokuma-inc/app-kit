@@ -51,3 +51,11 @@ jobs:
     with:
       app-kit-ref: ${{ github.sha }}
       working-directory: fixtures/App
+
+  archive:
+    # 鍵の要らないところ（Archive・スタブの署名・entitlements を入れる）までを確かめる
+    uses: ./.github/workflows/app-archive.yml
+    with:
+      app-kit-ref: ${{ github.sha }}
+      export: false
+      working-directory: fixtures/App
