@@ -1,0 +1,15 @@
+# app-kit が配るファイル（shilokuma-inc/app-kit の managed/）。直すときは app-kit で直す。このリポジトリで直すと、次に版を上げたときに上書きされる
+name: バグ修正
+description: バグのIssue
+title: "【FIX】"
+labels: [bug]
+projects: []
+body:
+  - type: textarea
+    id: content
+    attributes:
+      label: 概要
+      description: バグ・修正したい機能の説明をお願いします
+      placeholder: バグ内容
+    validations:
+      required: true
