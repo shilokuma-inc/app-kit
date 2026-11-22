@@ -14,10 +14,19 @@ AskHub で開発する Apple のアプリのリポジトリに、CI・リリー�
 | `.github/workflows/app-*.yml` | 各リポジトリが呼ぶ再利用ワークフロー |
 | `.github/workflows/self-test.yml` | app-kit 自身の確かめ（`fixtures/` のアプリに再利用ワークフローを流す） |
 | `tools/` | 再利用ワークフローが、呼ばれた版の app-kit を取り出して使う道具 |
-| `schema/` | 各リポジトリの設定（`.github/app-kit.json`）の形 |
+| `schema/` | 各リポジトリの設定（`.github/app-kit.json`）と、クリエイティブアセットの案（`creative-spec.schema.json`）の形 |
 | `fixtures/` | 確かめ用の小さなアプリ |
 | `managed/` | 各リポジトリに写すファイル（置き場所と同じ並び）。呼ぶ側のワークフローは版を `{{APP_KIT_REF}}`・`{{APP_KIT_VERSION}}` の目印で持つ |
 | `manifest.json` | 写すファイルの一覧（`managed`）と、初めての入れ替えで外すファイル（`replaces`。`keepIfPresent` のファイルがあれば外さない） |
+
+## クリエイティブアセット
+
+App Store のプロダクトページのヘッダー（3840x1646）と検索結果の画像（3840x2560）は、`app-store-creative.yml` が書き出す（上げない）。
+AskHub の司令塔が、案（文言・色・使う画面。`schema/creative-spec.schema.json`）を入力 `spec` に入れて起動し、artifact を取り込んで、人が AskHub で確かめた後に App Store Connect に上げる。
+
+- 端末に載せる画面は、6.9 inch の撮影の artifact `screenshots-APP_IPHONE_67`。入力 `screenshots_run` に前の実行の id を渡すと、撮り直さずにその画面を使う
+- 雛形は `tools/creative/creative.html`。文字は安全領域に収め、はみ出しなどは `creative-report` の `report.json` に出す
+- 手元で書き出しを確かめる: `bash tools/tests/test-creative-render.sh`（Chrome と Xcode が要る）
 
 ## 呼ぶ側
 
