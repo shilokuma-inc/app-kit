@@ -11,6 +11,7 @@
   - 撮る表示サイズの数より多ければ、余った枠を `AppStore/screenshots.json` に書いた順に配り、配った表示サイズは言語を分けて撮る。撮影のジョブの数は `max_parallel` を超えない
   - 言語を分けた表示サイズは `screenshots-<表示サイズ>-part<n>` に上げ、ubuntu の merge のジョブが `screenshots-<表示サイズ>` にまとめ直す（取り込む artifact の名前と中身は変わらない）。6.3 inch の derive は merge の後に動く
 - 呼ぶ側の撮影のワークフローに、入力 `max_parallel` を足した（AskHub の司令塔が、同じ owner のほかの撮影と時間帯を見て決める）
+- 撮影で `working-directory` にサブディレクトリを指定すると、plan の入力の確かめ（checkout の前）がディレクトリが無くて失敗していたのを直した
 
 ## v1.0.1（2026-11-22）
 
