@@ -1,0 +1,251 @@
+# 各リポジトリの app-store-screenshots.yml から呼ぶ再利用ワークフロー（App Store のスクショを撮るだけ。上げない）。
+# AskHub の司令塔が、release ブランチで呼ぶ側のワークフローを workflow_dispatch で起動し、artifact screenshots-<表示サイズ>（中身は <言語>/<画面>.png）を取り込む。
+# App Store Connect に上げるのは、人が確かめた後の司令塔だけ（app-kit では上げない）。
+#
+# 撮る画面と機種は呼んだ側の AppStore/screenshots.json、言語は AppStore/languages.json、プロジェクトと Scheme は AppStore/app.json で決める。
+# 起動の条件（workflow_dispatch の入力）と concurrency は、呼ぶ側のワークフローに書く。Secrets は受け取らない。
+name: app-store-screenshots
+
+on:
+  workflow_call:
+    inputs:
+      app-kit-ref:
+        description: 呼んだ app-kit のコミット（uses の @ の後ろと同じ 40 桁）。この版の道具を取り出して使う
+        type: string
+        required: true
+      display_types:
+        description: 撮る表示サイズ（カンマ区切り）。空なら screenshots.json のすべて
+        type: string
+        default: ''
+      languages:
+        description: 撮る言語（カンマ区切り）。空なら languages.json のすべて
+        type: string
+        default: ''
+      allow_non_release:
+        description: release/** 以外のブランチでも撮る（撮影の仕組みを確かめるときだけ）
+        type: boolean
+        default: false
+      upload:
+        description: 前の版の入力との互換のためだけにある。上げるのは AskHub の司令塔なので、true なら止める
+        type: boolean
+        default: false
+      working-directory:
+        description: アプリのあるディレクトリ（リポジトリの直下から）
+        type: string
+        default: '.'
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    outputs:
+      capture: ${{ steps.matrix.outputs.capture }}
+      derive: ${{ steps.matrix.outputs.derive }}
+      has_derive: ${{ steps.matrix.outputs.has_derive }}
+
+    steps:
+      - name: Check inputs
+        env:
+          REF: ${{ github.ref }}
+          ALLOW_NON_RELEASE: ${{ inputs.allow_non_release }}
+          UPLOAD: ${{ inputs.upload }}
+        run: |
+          if [[ "$UPLOAD" == "true" ]]; then
+            echo "::error::app-kit の撮影は撮るだけです。App Store Connect には AskHub の司令塔が、人が確かめた後に上げます（upload を false にしてください）"
+            exit 1
+          fi
+          if [[ "$REF" != refs/heads/release/* && "$ALLOW_NON_RELEASE" != "true" ]]; then
+            echo "::error::スクショはリリースのときだけ撮ります。release/** ブランチで起動してください（今: $REF）"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get app-kit
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+        run: |
+          if [[ ! "$APP_KIT_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::app-kit-ref は app-kit のコミット（40 桁）にしてください: $APP_KIT_REF"
+            exit 1
+          fi
+          dir="$RUNNER_TEMP/app-kit"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/shilokuma-inc/app-kit.git "$APP_KIT_REF"
+          git -C "$dir" checkout -q --detach FETCH_HEAD
+          echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Resolve display types
+        id: matrix
+        # 指定の誤りは、撮影（macOS のランナーで数十分）の前にここで落とす
+        env:
+          DISPLAY_TYPES: ${{ inputs.display_types }}
+          LANGUAGES: ${{ inputs.languages }}
+        run: |
+          set -euo pipefail
+          export APP_STORE_ROOT="$PWD"
+          config="$APP_KIT_DIR/tools/screenshots/app_store_config.py"
+          python3 "$config" languages "$LANGUAGES" > /dev/null
+          python3 "$config" scenes > /dev/null
+          matrix="$(python3 "$config" display-types "$DISPLAY_TYPES")"
+          echo "$matrix" | python3 -m json.tool
+          {
+            echo "capture=$(jq -c .capture <<<"$matrix")"
+            echo "derive=$(jq -c .derive <<<"$matrix")"
+            echo "has_derive=$(jq -r '.derive | length > 0' <<<"$matrix")"
+          } >> "$GITHUB_OUTPUT"
+
+  capture:
+    name: capture (${{ matrix.label }})
+    needs: plan
+    # ランナーと Xcode は、表示サイズごとに screenshots.json の runsOn・xcodeVersion で決める
+    runs-on: ${{ matrix.runs_on }}
+    timeout-minutes: 90
+    strategy:
+      # 1 本ずつ撮る。片方のサイズが失敗しても、残りは撮り切る
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.capture) }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      SCREENSHOTS_DIR: build/screenshots
+
+    steps:
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: ${{ matrix.xcode_version }}
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get app-kit
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+        run: |
+          dir="$RUNNER_TEMP/app-kit"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/shilokuma-inc/app-kit.git "$APP_KIT_REF"
+          git -C "$dir" checkout -q --detach FETCH_HEAD
+          echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Prepare iOS runtime
+        # ランナーのイメージには、選んだ Xcode に合う iOS のランタイムが無いことがある
+        # （xcode-27 は iOS 27.0 だけで、iPhone Duo には iOS 27.1 が要る）ので、無ければ入れる
+        run: |
+          set -euo pipefail
+          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
+          if ! xcrun simctl list runtimes | grep -qF "iOS ${sdk} ("; then
+            echo "iOS ${sdk} のランタイムが無いのでダウンロードします"
+            xcodebuild -downloadPlatform iOS
+          fi
+          xcrun simctl list runtimes
+
+      - name: Allow build tool plugins and macros
+        run: |
+          defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidatation -bool YES
+          defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
+
+      - name: Capture screenshots
+        env:
+          DISPLAY_TYPE: ${{ matrix.display_type }}
+          LANGUAGES: ${{ inputs.languages }}
+          SKIP_PACKAGE_PLUGIN_VALIDATION: '1'
+          # xcode-27 のランナー（iPhone Duo）は起動直後の負荷が高く、既定の待ちでは 1 枚目が起動画面のまま撮れた。
+          # ほかのサイズも数十秒延びるだけなので、すべてのサイズで同じにする
+          WARMUP_SECONDS: 60
+          SETTLE_MINIMUM: 10
+        run: |
+          export APP_STORE_ROOT="$PWD"
+          "$APP_KIT_DIR/tools/screenshots/capture_screenshots.sh" "$DISPLAY_TYPE" "$LANGUAGES"
+
+      - name: Upload screenshots as artifact
+        # 途中で失敗したときも撮れたぶんは残す（司令塔は撮れた表示サイズだけ取り込む）
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots-${{ matrix.display_type }}
+          path: ${{ inputs.working-directory }}/${{ env.SCREENSHOTS_DIR }}/${{ matrix.display_type }}
+          if-no-files-found: warn
+
+  derive:
+    name: derive (${{ matrix.label }})
+    needs: [plan, capture]
+    if: ${{ !cancelled() && needs.plan.outputs.has_derive == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.derive) }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    env:
+      SCREENSHOTS_DIR: build/screenshots
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get app-kit
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+        run: |
+          dir="$RUNNER_TEMP/app-kit"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/shilokuma-inc/app-kit.git "$APP_KIT_REF"
+          git -C "$dir" checkout -q --detach FETCH_HEAD
+          echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Download source screenshots
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: screenshots-${{ matrix.source }}
+          path: ${{ inputs.working-directory }}/${{ env.SCREENSHOTS_DIR }}/${{ matrix.source }}
+
+      - name: Derive screenshots
+        env:
+          DISPLAY_TYPE: ${{ matrix.display_type }}
+          LANGUAGES: ${{ inputs.languages }}
+        run: |
+          set -euo pipefail
+          export APP_STORE_ROOT="$PWD"
+          tools="$APP_KIT_DIR/tools/screenshots"
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet --disable-pip-version-check pillow
+          options=()
+          if [ -n "$LANGUAGES" ]; then
+            options+=(--languages "$LANGUAGES")
+          fi
+          "$RUNNER_TEMP/venv/bin/python" "$tools/derive_screenshots.py" \
+            --display-type "$DISPLAY_TYPE" \
+            --screenshots-dir "$SCREENSHOTS_DIR" \
+            ${options[@]+"${options[@]}"}
+          python3 "$tools/verify_screenshots.py" \
+            --directory "$SCREENSHOTS_DIR/$DISPLAY_TYPE" \
+            --sizes "$(python3 "$tools/app_store_config.py" sizes "$DISPLAY_TYPE" | paste -sd, -)"
+
+      - name: Upload screenshots as artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots-${{ matrix.display_type }}
+          path: ${{ inputs.working-directory }}/${{ env.SCREENSHOTS_DIR }}/${{ matrix.display_type }}
+          if-no-files-found: error
