@@ -3,6 +3,7 @@
 
 手元では `python3 tools/tests/test-screenshot-matrix.py`。max_parallel と、撮る表示サイズ・言語の数の組み合わせで、
 撮影のジョブの数が max_parallel を超えないこと、言語の分け方、artifact の名前、merge の対象を確かめる。
+表示サイズから決める Simulator のプラットフォーム（iOS / visionOS）と、撮れない表示サイズを断ることも確かめる。
 """
 
 from __future__ import annotations
@@ -22,6 +23,11 @@ DISPLAY_TYPES = {
     "APP_IPHONE_DUO": {"label": "iPhone Duo", "devices": ["iPhone Duo"], "sizes": ["1398x2034"], "runsOn": "xcode-27", "xcodeVersion": "27.1"},
     "APP_IPHONE_67": {"label": "iPhone 6.9 inch", "devices": ["iPhone 17 Pro Max"], "sizes": ["1320x2868"]},
     "APP_IPAD_PRO_3GEN_129": {"label": "iPad 13 inch", "devices": ["iPad Pro 13-inch (M5)"], "sizes": ["2064x2752"]},
+}
+
+# template-app-visionos と同じ（表示サイズは Apple Vision Pro の 1 つだけ）
+VISION_DISPLAY_TYPES = {
+    "APP_APPLE_VISION_PRO": {"label": "Apple Vision Pro", "devices": ["Apple Vision Pro"], "sizes": ["3840x2160"]},
 }
 
 
@@ -46,9 +52,9 @@ class ScreenshotMatrixTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_config(self, *arguments: str) -> subprocess.CompletedProcess:
+    def run_config(self, *arguments: str, command: str = "display-types") -> subprocess.CompletedProcess:
         return subprocess.run(
-            [sys.executable, str(CONFIG), "display-types", *arguments],
+            [sys.executable, str(CONFIG), command, *arguments],
             capture_output=True,
             text=True,
             env={"APP_STORE_ROOT": str(self.root), "PATH": "/usr/bin:/bin"},
@@ -130,6 +136,55 @@ class ScreenshotMatrixTests(unittest.TestCase):
         self.write(languages=["ja", "en", "fr", "de"], display_types={"APP_IPHONE_67": DISPLAY_TYPES["APP_IPHONE_67"]})
         matrix = self.matrix("", "--max-parallel", "2", "--languages", "fr,ja")
         self.assertEqual([job["languages"] for job in matrix["capture"]], ["fr", "ja"])
+
+    def test_iphone_and_ipad_are_captured_on_ios(self) -> None:
+        matrix = self.matrix("", "--max-parallel", "5")
+        self.assertEqual({job["platform"] for job in matrix["capture"]}, {"iOS"})
+
+    def test_apple_vision_pro_is_captured_on_visionos(self) -> None:
+        self.write(languages=["ja", "en"], display_types=VISION_DISPLAY_TYPES)
+        matrix = self.matrix("")
+        self.assertEqual(matrix["capture"], [{
+            "display_type": "APP_APPLE_VISION_PRO",
+            "platform": "visionOS",
+            "runs_on": "macos-latest",
+            "xcode_version": "26.6",
+            "label": "Apple Vision Pro",
+            "languages": "",
+            "artifact": "screenshots-APP_APPLE_VISION_PRO",
+        }])
+        self.assertEqual(matrix["derive"], [])
+        # 表示サイズが 1 つなので、余った枠で言語を分ける（iOS と同じ）
+        matrix = self.matrix("", "--max-parallel", "2")
+        self.assertEqual(
+            [(job["platform"], job["languages"], job["artifact"]) for job in matrix["capture"]],
+            [
+                ("visionOS", "ja", "screenshots-APP_APPLE_VISION_PRO-part1"),
+                ("visionOS", "en", "screenshots-APP_APPLE_VISION_PRO-part2"),
+            ],
+        )
+
+    def test_platform_command(self) -> None:
+        self.write(languages=["ja"], display_types={**DISPLAY_TYPES, **VISION_DISPLAY_TYPES})
+        for name, expected in (("APP_IPHONE_67", "iOS"), ("APP_IPAD_PRO_3GEN_129", "iOS"), ("APP_APPLE_VISION_PRO", "visionOS")):
+            with self.subTest(display_type=name):
+                result = self.run_config(name, command="platform")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), expected)
+
+    def test_rejects_display_types_that_cannot_be_captured(self) -> None:
+        # Mac などは撮れないので、撮影（macOS のランナー）の前に plan で止める
+        self.write(languages=["ja"], display_types={
+            **DISPLAY_TYPES,
+            "APP_DESKTOP": {"label": "Mac", "devices": ["Mac"], "sizes": ["2880x1800"]},
+        })
+        for arguments in (("",), ("APP_DESKTOP",)):
+            with self.subTest(display_types=arguments[0]):
+                result = self.run_config(*arguments)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("APP_DESKTOP は撮れない表示サイズ", result.stderr)
+        # 撮れる表示サイズだけを指定すれば撮れる
+        self.assertEqual([job["display_type"] for job in self.matrix("APP_IPHONE_67")["capture"]], ["APP_IPHONE_67"])
 
     def test_rejects_out_of_range(self) -> None:
         for value in ("0", "6"):
