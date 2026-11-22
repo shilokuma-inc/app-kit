@@ -1,0 +1,304 @@
+# 各リポジトリの Upload・Archive から呼ぶ再利用ワークフロー（Archive → 書き出し → App Store Connect への Upload）。
+# リポジトリごとの値は、呼んだ側の .github/app-kit.json から読む（archive.platforms のプラットフォームごとに 1 つのジョブ）。
+#
+# 認証はすべて App Store Connect の API キーで行う（Apple ID・App 用パスワードは使わない）。
+# Upload は ExportOptions.plist の destination を upload にした xcodebuild -exportArchive で行う。
+# Secrets は、組織をまたぐと secrets: inherit が効かないので、呼ぶ側で名前を並べて渡す。
+# 書き出した IPA は artifact に上げない（public のリポジトリでは誰でも取れるため）。
+name: app-archive
+
+on:
+  workflow_call:
+    inputs:
+      app-kit-ref:
+        description: 呼んだ app-kit のコミット（uses の @ の後ろと同じ 40 桁）。この版の道具を取り出して使う
+        type: string
+        required: true
+      export:
+        description: Archive の後に IPA の書き出しまで行うか（App Store Connect の API キーが要る）。false なら Archive だけを確かめる
+        type: boolean
+        default: true
+      upload:
+        description: 書き出した IPA を App Store Connect に上げるか（export が true のときだけ）
+        type: boolean
+        default: false
+      working-directory:
+        description: アプリのあるディレクトリ（リポジトリの直下から）。設定はこの下の .github/app-kit.json を読む
+        type: string
+        default: '.'
+      runs-on:
+        description: Archive のランナーのラベル
+        type: string
+        default: macos-latest
+    secrets:
+      EXPORT_OPTIONS:
+        description: ExportOptions.plist の内容（destination と、Upload のときの manageAppVersionAndBuildNumber はワークフローが上書きする）
+        required: false
+      APPLE_API_KEY_BASE64:
+        description: App Store Connect の API キー（.p8）を base64 にしたもの
+        required: false
+      APPLE_API_KEY_ID:
+        description: App Store Connect の API キーの Key ID
+        required: false
+      APPLE_API_ISSUER_ID:
+        description: App Store Connect の API キーの Issuer ID
+        required: false
+      TESTFLIGHT_INTERNAL_TESTERS:
+        description: TestFlight の内部テスターにする人のメールアドレス（カンマ区切り。無ければ内部テスターの設定を省く）
+        required: false
+      GOOGLE_SERVICE_INFO_PLIST_BASE64:
+        description: GoogleService-Info.plist を base64 にしたもの（.github/app-kit.json の archive.googleServiceInfo のリポジトリだけ）
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    outputs:
+      platforms: ${{ steps.config.outputs.platforms }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get app-kit
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+        run: |
+          if [[ ! "$APP_KIT_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::app-kit-ref は app-kit のコミット（40 桁）にしてください: $APP_KIT_REF"
+            exit 1
+          fi
+          dir="$RUNNER_TEMP/app-kit"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/shilokuma-inc/app-kit.git "$APP_KIT_REF"
+          git -C "$dir" checkout -q --detach FETCH_HEAD
+          echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Read .github/app-kit.json
+        id: config
+        run: |
+          "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
+          cat "$RUNNER_TEMP/app-kit.env"
+          platforms=$(sed -n 's/^APP_KIT_ARCHIVE_PLATFORMS_JSON=//p' "$RUNNER_TEMP/app-kit.env")
+          if jq -e 'index("macOS")' <<<"$platforms" >/dev/null; then
+            echo "::error::macOS の Archive・Upload は、この版の app-kit ではまだ扱いません（.github/app-kit.json の archive.platforms から外すか、リポジトリのワークフローで行ってください）"
+            exit 1
+          fi
+          echo "platforms=$platforms" >> "$GITHUB_OUTPUT"
+
+  archive:
+    name: archive (${{ matrix.platform }})
+    needs: plan
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ fromJSON(needs.plan.outputs.platforms) }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get app-kit
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+        run: |
+          dir="$RUNNER_TEMP/app-kit"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/shilokuma-inc/app-kit.git "$APP_KIT_REF"
+          git -C "$dir" checkout -q --detach FETCH_HEAD
+          echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Read .github/app-kit.json
+        id: config
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+        run: |
+          "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
+          cat "$RUNNER_TEMP/app-kit.env" >> "$GITHUB_ENV"
+          echo "xcode-version=$(sed -n 's/^APP_KIT_XCODE_VERSION=//p' "$RUNNER_TEMP/app-kit.env")" >> "$GITHUB_OUTPUT"
+          case "$PLATFORM" in
+            iOS) sdk=iphoneos ;;
+            visionOS) sdk=xros ;;
+            *) echo "::error::Archive できないプラットフォームです: $PLATFORM"; exit 1 ;;
+          esac
+          # ExportOptions.plist と API の秘密鍵は、リポジトリの下ではなく RUNNER_TEMP に置く
+          {
+            echo "SDK=$sdk"
+            echo "ARCHIVE_PATH=$RUNNER_TEMP/build.xcarchive"
+            echo "EXPORT_OPTIONS_PATH=$RUNNER_TEMP/ExportOptions.plist"
+            echo "API_KEY_PATH=$RUNNER_TEMP/private_keys/AuthKey_$APPLE_API_KEY_ID.p8"
+          } >> "$GITHUB_ENV"
+
+      - name: Check secrets
+        # 書き出しには App Store Connect の API キーと ExportOptions.plist が要る。足りなければ、どの Secret かを出して止める（値は出さない）
+        if: inputs.export
+        env:
+          EXPORT_OPTIONS: ${{ secrets.EXPORT_OPTIONS }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          missing=()
+          [[ -n "$EXPORT_OPTIONS" ]] || missing+=(EXPORT_OPTIONS)
+          [[ -n "$APPLE_API_KEY_BASE64" ]] || missing+=(APPLE_API_KEY_BASE64)
+          [[ -n "$APPLE_API_KEY_ID" ]] || missing+=(APPLE_API_KEY_ID)
+          [[ -n "$APPLE_API_ISSUER_ID" ]] || missing+=(APPLE_API_ISSUER_ID)
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Secrets が足りません: ${missing[*]}（呼ぶ側のワークフローの secrets で渡しているか、リポジトリか organization に登録してあるかを確かめてください）"
+            exit 1
+          fi
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: ${{ steps.config.outputs.xcode-version }}
+
+      - name: Generate project with XcodeGen
+        if: env.APP_KIT_GENERATE == 'xcodegen'
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate
+
+      - name: Allow build tool plugins and macros
+        run: |
+          defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidatation -bool YES
+          defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
+
+      - name: Install visionOS platform
+        # ランナーのイメージから visionOS が外れたときに備えて、無ければ選んだ Xcode に合うものを入れる
+        if: matrix.platform == 'visionOS'
+        run: |
+          xcodebuild -showsdks | grep -q xros || xcodebuild -downloadPlatform visionOS
+
+      - name: Create GoogleService-Info.plist
+        # GoogleService-Info.plist はリポジトリに入れない。Secret があれば書き出してアプリに入れる。
+        # 無いときは Firebase につながないビルドになるので、止めずに注釈で知らせる
+        if: env.APP_KIT_GOOGLE_SERVICE_INFO != ''
+        env:
+          GOOGLE_SERVICE_INFO_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+        run: |
+          if [[ -z "$GOOGLE_SERVICE_INFO_PLIST_BASE64" ]]; then
+            echo "::warning::Secret GOOGLE_SERVICE_INFO_PLIST_BASE64 が無いため、Firebase につながないビルドになります"
+            echo "⚠️ Secret \`GOOGLE_SERVICE_INFO_PLIST_BASE64\` が無いため、Firebase につながないビルドです" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 --decode > "$APP_KIT_GOOGLE_SERVICE_INFO"
+          plutil -lint "$APP_KIT_GOOGLE_SERVICE_INFO"
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project "$APP_KIT_PROJECT" \
+            -scheme "$APP_KIT_SCHEME" \
+            -sdk "$SDK" \
+            -configuration Release \
+            -archivePath "$ARCHIVE_PATH" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Fix signatures of stub frameworks
+        # 静的な xcframework（Firebase・Google Mobile Ads など）は、同梱するときに Xcode がバイナリを外して空のスタブを差し込む。
+        # スタブはリンカーの仮の署名のままで識別子が arm64-apple になっていて、署名なしの Archive では Xcode の署名で直らない。
+        # Export はこの識別子のまま再署名するので、App Store Connect が Invalid Signature で弾く。
+        # Info.plist の CFBundleIdentifier と識別子が違うフレームワークを、その識別子でアドホック署名し直す（本番の署名は Export がする）
+        run: '"$APP_KIT_DIR/tools/fix-stub-framework-signatures.sh" "$ARCHIVE_PATH"'
+
+      - name: Embed entitlements into the unsigned archive
+        # 署名なしの Archive では、entitlements のファイル（CODE_SIGN_ENTITLEMENTS）がアプリに入らない。
+        # Export は Archive の中のアプリを再署名するだけなので、そのままだと配信ビルドに基本の entitlement しか付かず、WeatherKit などが実機で動かない。
+        # entitlements のファイルでアプリをアドホック署名しておく（本番の署名は Export がする）。対象はアプリ本体だけ（App Extension は入れない）
+        run: '"$APP_KIT_DIR/tools/embed-entitlements.sh" "$ARCHIVE_PATH"'
+
+      - name: Create ExportOptions.plist and API private key
+        # Secrets はシェル展開ではなく env で渡す
+        if: inputs.export
+        env:
+          EXPORT_OPTIONS: ${{ secrets.EXPORT_OPTIONS }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+        run: |
+          printf '%s' "$EXPORT_OPTIONS" > "$EXPORT_OPTIONS_PATH"
+          plutil -lint "$EXPORT_OPTIONS_PATH"
+          mkdir -p "$(dirname "$API_KEY_PATH")"
+          printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$API_KEY_PATH"
+
+      - name: Export IPA
+        if: inputs.export
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          plutil -replace destination -string export "$EXPORT_OPTIONS_PATH"
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_KEY_PATH" \
+            -authenticationKeyID "$APPLE_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APPLE_API_ISSUER_ID"
+
+      - name: Verify entitlements of the exported IPA
+        # entitlements のファイルに書いた項目が、書き出した IPA のアプリにも入っているかを確かめる。
+        # 欠けたまま配信すると、ビルドも Upload も通るのに、実機でその機能だけ動かない
+        if: inputs.export
+        run: '"$APP_KIT_DIR/tools/verify-exported-entitlements.sh" "$RUNNER_TEMP/export"'
+
+      - name: Check app exists in App Store Connect
+        # App Store Connect にアプリが無いと、Upload が "Error Downloading App Information" で落ち、原因が分かりにくい。
+        # アプリの作成は API でできないので、読むだけで確かめ、無ければ作り方を Job Summary に出して止める
+        if: inputs.export && inputs.upload
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$ARCHIVE_PATH/Info.plist") \
+          APP_NAME="$APP_KIT_SCHEME" \
+            ruby "$APP_KIT_DIR/tools/app-store-connect/check-app-store-app.rb"
+
+      - name: Set up TestFlight internal testers
+        # 内部テストグループ（すべてのビルドを自動で配る）を用意し、Secret TESTFLIGHT_INTERNAL_TESTERS のメールアドレスを内部テスターに入れる。
+        # 失敗しても Upload は止めない（Job Summary と注釈で知らせる）。メールアドレスは Secret で渡す（変数の値はログにそのまま出るため）
+        if: inputs.export && inputs.upload
+        continue-on-error: true
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          TESTERS: ${{ secrets.TESTFLIGHT_INTERNAL_TESTERS }}
+        run: |
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$ARCHIVE_PATH/Info.plist") \
+            ruby "$APP_KIT_DIR/tools/app-store-connect/ensure-internal-testers.rb"
+
+      - name: Upload to App Store Connect
+        # ビルド番号は Xcode に振らせる（manageAppVersionAndBuildNumber）。App Store Connect の最新のビルド番号を見て増やすので、
+        # xcconfig の CURRENT_PROJECT_VERSION を手で上げなくてよい。organization で共有する EXPORT_OPTIONS は書き換えず、ランナーの写しだけを変える
+        if: inputs.export && inputs.upload
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          plutil -replace destination -string upload "$EXPORT_OPTIONS_PATH"
+          plutil -replace manageAppVersionAndBuildNumber -bool YES "$EXPORT_OPTIONS_PATH"
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
+            -exportPath "$RUNNER_TEMP/upload" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$API_KEY_PATH" \
+            -authenticationKeyID "$APPLE_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APPLE_API_ISSUER_ID"

@@ -53,12 +53,14 @@ expect_error() {
 expect_ok "最小の設定" \
   '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"]}' \
   "APP_KIT_PROJECT=App.xcodeproj" "APP_KIT_SCHEME=App" "APP_KIT_PLATFORMS=iOS" "APP_KIT_TEST_PLATFORM=iOS" \
-  "APP_KIT_GENERATE=" "APP_KIT_UI_TESTS=" "APP_KIT_XCODE_VERSION=26.6" "APP_KIT_SWIFTLINT=true" "APP_KIT_SWIFT_PACKAGES="
+  "APP_KIT_GENERATE=" "APP_KIT_UI_TESTS=" "APP_KIT_XCODE_VERSION=26.6" "APP_KIT_SWIFTLINT=true" "APP_KIT_SWIFT_PACKAGES=" \
+  "APP_KIT_ARCHIVE_PLATFORMS=iOS" 'APP_KIT_ARCHIVE_PLATFORMS_JSON=["iOS"]' "APP_KIT_GOOGLE_SERVICE_INFO="
 
 expect_ok "すべての欄" \
-  '{"v":1,"project":"Sub/App.xcodeproj","scheme":"App-iOS","platforms":["macOS","iOS","visionOS"],"generate":"xcodegen","uiTests":"AppUITests","xcodeVersion":"27.1","swiftlint":false,"swiftPackages":["Kit","Packages/Core"],"archive":{},"unmanaged":[".coderabbit.yaml"]}' \
+  '{"v":1,"project":"Sub/App.xcodeproj","scheme":"App-iOS","platforms":["macOS","iOS","visionOS"],"generate":"xcodegen","uiTests":"AppUITests","xcodeVersion":"27.1","swiftlint":false,"swiftPackages":["Kit","Packages/Core"],"archive":{"platforms":["iOS","macOS"],"googleServiceInfo":"App/GoogleService-Info.plist"},"unmanaged":[".coderabbit.yaml"]}' \
   "APP_KIT_PROJECT=Sub/App.xcodeproj" "APP_KIT_SCHEME=App-iOS" "APP_KIT_PLATFORMS=macOS iOS visionOS" "APP_KIT_TEST_PLATFORM=macOS" \
-  "APP_KIT_GENERATE=xcodegen" "APP_KIT_UI_TESTS=AppUITests" "APP_KIT_XCODE_VERSION=27.1" "APP_KIT_SWIFTLINT=false" "APP_KIT_SWIFT_PACKAGES=Kit Packages/Core"
+  "APP_KIT_GENERATE=xcodegen" "APP_KIT_UI_TESTS=AppUITests" "APP_KIT_XCODE_VERSION=27.1" "APP_KIT_SWIFTLINT=false" "APP_KIT_SWIFT_PACKAGES=Kit Packages/Core" \
+  "APP_KIT_ARCHIVE_PLATFORMS=iOS macOS" 'APP_KIT_ARCHIVE_PLATFORMS_JSON=["iOS","macOS"]' "APP_KIT_GOOGLE_SERVICE_INFO=App/GoogleService-Info.plist"
 
 expect_ok "null の欄は省いたのと同じ" \
   '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"generate":null,"uiTests":null,"xcodeVersion":null}' \
@@ -101,6 +103,14 @@ expect_error "xcodeVersion の形" '{"v":1,"project":"App.xcodeproj","scheme":"A
 expect_error "swiftlint が文字" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"swiftlint":"yes"}' "swiftlint は"
 expect_error "swiftPackages が外を指す" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"swiftPackages":["../Kit"]}' "swiftPackages は"
 expect_error "swiftPackages に空白" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"swiftPackages":["My Kit"]}' "swiftPackages は"
+expect_ok "Archive の既定は先頭のプラットフォーム" \
+  '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["visionOS","iOS"],"archive":{}}' \
+  "APP_KIT_ARCHIVE_PLATFORMS=visionOS" 'APP_KIT_ARCHIVE_PLATFORMS_JSON=["visionOS"]'
+expect_error "archive がオブジェクトでない" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":true}' "archive はオブジェクト"
+expect_error "archive.platforms が空" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"platforms":[]}}' "archive.platforms は"
+expect_error "archive.platforms に知らない値" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"platforms":["tvOS"]}}' "archive.platforms は"
+expect_error "googleServiceInfo が別のファイル" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"googleServiceInfo":"App/Info.plist"}}' "archive.googleServiceInfo は"
+expect_error "googleServiceInfo が外を指す" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"googleServiceInfo":"../x/GoogleService-Info.plist"}}' "archive.googleServiceInfo は"
 expect_error "理由をすべて出す" '{"v":1,"project":"App","scheme":"","platforms":["iOS"]}' "scheme の形"
 
 if [[ "$failures" -gt 0 ]]; then
