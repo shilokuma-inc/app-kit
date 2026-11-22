@@ -26,6 +26,10 @@ on:
         description: 'release/** 以外のブランチでも撮る（撮影の仕組みを確かめるときだけ）'
         type: boolean
         default: false
+      max_parallel:
+        description: '撮影に同時に使う macOS ランナーの数（1〜5）。撮る表示サイズの数より多ければ、余った枠のぶん言語を分けて撮る'
+        type: number
+        default: 1
 
 permissions:
   contents: read
@@ -44,3 +48,4 @@ jobs:
       languages: ${{ inputs.languages }}
       upload: ${{ inputs.upload }}
       allow_non_release: ${{ inputs.allow_non_release }}
+      max_parallel: ${{ inputs.max_parallel }}
