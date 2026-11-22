@@ -30,10 +30,22 @@ jobs:
         run: bash tools/tests/test-read-config.sh
 
       - name: ShellCheck
-        run: shellcheck tools/*.sh tools/tests/*.sh
+        run: shellcheck tools/*.sh tools/tests/*.sh tools/screenshots/*.sh
 
       - name: actionlint
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
+
+      - name: Validate fixture screenshot configs
+        # 撮影の再利用ワークフローの plan と同じ確かめ（撮るのは試しの 1 本のリポジトリで確かめる）
+        run: |
+          for app in fixtures/*/; do
+            [[ -d "$app/AppStore" ]] || continue
+            echo "::group::$app"
+            APP_STORE_ROOT="$PWD/$app" python3 tools/screenshots/app_store_config.py languages "" > /dev/null
+            APP_STORE_ROOT="$PWD/$app" python3 tools/screenshots/app_store_config.py scenes
+            APP_STORE_ROOT="$PWD/$app" python3 tools/screenshots/app_store_config.py display-types "" | python3 -m json.tool
+            echo "::endgroup::"
+          done
 
       - name: Validate fixture configs
         # fixtures の設定が、今の版の read-config.sh で読めること
