@@ -36,7 +36,8 @@ jobs:
   screenshots:
     uses: shilokuma-inc/app-kit/.github/workflows/app-store-screenshots.yml@{{APP_KIT_REF}} # {{APP_KIT_VERSION}}
     with:
-      app-kit-ref: {{APP_KIT_REF}}
+      # 引用符で囲む（数字と e だけのコミットを、YAML が数として読まないように）
+      app-kit-ref: '{{APP_KIT_REF}}'
       display_types: ${{ inputs.display_types }}
       languages: ${{ inputs.languages }}
       upload: ${{ inputs.upload }}

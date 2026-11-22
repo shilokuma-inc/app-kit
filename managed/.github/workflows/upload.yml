@@ -27,7 +27,8 @@ jobs:
     if: vars.ENABLE_DELIVERY != 'false'
     uses: shilokuma-inc/app-kit/.github/workflows/app-archive.yml@{{APP_KIT_REF}} # {{APP_KIT_VERSION}}
     with:
-      app-kit-ref: {{APP_KIT_REF}}
+      # 引用符で囲む（数字と e だけのコミットを、YAML が数として読まないように）
+      app-kit-ref: '{{APP_KIT_REF}}'
       upload: true
     # 組織をまたぐと secrets: inherit が効かないので、名前を並べて渡す
     secrets:
