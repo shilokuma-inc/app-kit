@@ -3,6 +3,7 @@
 # App Store Connect に上げるのは、人が確かめた後の司令塔だけ（app-kit では上げない）。
 #
 # 撮る画面と機種は呼んだ側の AppStore/screenshots.json、言語は AppStore/languages.json、プロジェクトと Scheme は AppStore/app.json で決める。
+# 撮れる表示サイズは iPhone・iPad（iOS の Simulator）と Apple Vision Pro（visionOS の Simulator）。プラットフォームは表示サイズの名前で決まる。
 # 同時に使う macOS ランナーの数は max_parallel（既定 1 = 1 本ずつ）。司令塔が、同じ owner のほかの撮影や時間帯を見て決める。
 # 撮る表示サイズの数より多ければ、余った枠のぶん言語を分けて撮り、merge のジョブが screenshots-<表示サイズ> にまとめ直す。
 # 起動の条件（workflow_dispatch の入力）と concurrency は、呼ぶ側のワークフローに書く。Secrets は受け取らない。
@@ -163,15 +164,25 @@ jobs:
           git -C "$dir" checkout -q --detach FETCH_HEAD
           echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
 
-      - name: Prepare iOS runtime
-        # ランナーのイメージには、選んだ Xcode に合う iOS のランタイムが無いことがある
-        # （xcode-27 は iOS 27.0 だけで、iPhone Duo には iOS 27.1 が要る）ので、無ければ入れる
+      - name: Prepare ${{ matrix.platform }} runtime
+        # ランナーのイメージには、選んだ Xcode に合うランタイムが無いことがある
+        # （xcode-27 は iOS 27.0 だけで、iPhone Duo には iOS 27.1 が要る。visionOS は入っていないこともある）ので、無ければ入れる
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
-          sdk="$(xcrun --sdk iphonesimulator --show-sdk-version)"
-          if ! xcrun simctl list runtimes | grep -qF "iOS ${sdk} ("; then
-            echo "iOS ${sdk} のランタイムが無いのでダウンロードします"
-            xcodebuild -downloadPlatform iOS
+          case "$PLATFORM" in
+            iOS) sdk_name=iphonesimulator ;;
+            visionOS) sdk_name=xrsimulator ;;
+            *)
+              echo "::error::撮れないプラットフォームです: $PLATFORM"
+              exit 1
+              ;;
+          esac
+          sdk="$(xcrun --sdk "$sdk_name" --show-sdk-version)"
+          if ! xcrun simctl list runtimes | grep -qF "${PLATFORM} ${sdk} ("; then
+            echo "${PLATFORM} ${sdk} のランタイムが無いのでダウンロードします"
+            xcodebuild -downloadPlatform "$PLATFORM"
           fi
           xcrun simctl list runtimes
 
