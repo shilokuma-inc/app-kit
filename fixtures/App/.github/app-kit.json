@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "project": "FixtureApp.xcodeproj",
+  "scheme": "FixtureApp",
+  "platforms": ["iOS"],
+  "uiTests": "FixtureAppUITests"
+}
