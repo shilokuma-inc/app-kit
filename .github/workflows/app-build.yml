@@ -1,0 +1,180 @@
+# 各リポジトリの Build から呼ぶ再利用ワークフロー（ビルド・SwiftLint・Unit テスト・UI テスト）。
+# 呼ぶ側のジョブの名前を build にすると、チェックの名前は「build / build」になる（AskHub のワーカーとルールセットが待つ名前）。
+# リポジトリごとの値は、呼んだ側の .github/app-kit.json から読む（形は schema/app-kit.schema.json）。
+# 起動の条件（push・PR・concurrency）は、呼ぶ側のワークフローに書く。Secrets は受け取らない。
+name: app-build
+
+on:
+  workflow_call:
+    inputs:
+      app-kit-ref:
+        description: 呼んだ app-kit のコミット（uses の @ の後ろと同じ 40 桁）。再利用ワークフローには呼ばれた版を知る組み込みの値が無いので、この版の道具を取り出して使う
+        type: string
+        required: true
+      ui-tests:
+        description: UI テスト（.github/app-kit.json の uiTests）も流すか。false なら Unit テストだけ流す
+        type: boolean
+        default: true
+      working-directory:
+        description: アプリのあるディレクトリ（リポジトリの直下から）。設定はこの下の .github/app-kit.json を読む
+        type: string
+        default: '.'
+      runs-on:
+        description: ランナーのラベル
+        type: string
+        default: macos-latest
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runs-on }}
+    # UI テスト込みで、失敗したテストの再試行のぶんも見込む
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get app-kit
+        # actions/checkout は作業場所の外に置けず、呼んだ側の SwiftLint などが app-kit の中身まで見てしまうので、git で RUNNER_TEMP に取り出す
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+        run: |
+          if [[ ! "$APP_KIT_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::app-kit-ref は app-kit のコミット（40 桁）にしてください: $APP_KIT_REF"
+            exit 1
+          fi
+          dir="$RUNNER_TEMP/app-kit"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/shilokuma-inc/app-kit.git "$APP_KIT_REF"
+          git -C "$dir" checkout -q --detach FETCH_HEAD
+          echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
+          echo "app-kit: $APP_KIT_REF"
+
+      - name: Read .github/app-kit.json
+        id: config
+        run: |
+          "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
+          cat "$RUNNER_TEMP/app-kit.env"
+          cat "$RUNNER_TEMP/app-kit.env" >> "$GITHUB_ENV"
+          echo "xcode-version=$(sed -n 's/^APP_KIT_XCODE_VERSION=//p' "$RUNNER_TEMP/app-kit.env")" >> "$GITHUB_OUTPUT"
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: ${{ steps.config.outputs.xcode-version }}
+
+      - name: Generate project with XcodeGen
+        if: env.APP_KIT_GENERATE == 'xcodegen'
+        run: |
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate
+
+      - name: Allow build tool plugins and macros
+        # SwiftLint のビルドのプラグインなどを、Xcode の確認の画面なしで使う
+        run: |
+          defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidatation -bool YES
+          defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
+
+      - name: Resolve Swift packages
+        # DerivedData は呼んだ側の作業場所の外に置く（SwiftLint や git の差分に入らないように）
+        run: |
+          echo "DERIVED_DATA=$RUNNER_TEMP/DerivedData" >> "$GITHUB_ENV"
+          xcodebuild -resolvePackageDependencies \
+            -project "$APP_KIT_PROJECT" \
+            -scheme "$APP_KIT_SCHEME" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData"
+
+      - name: SwiftLint
+        # ビルドのプラグインと同じ版の SwiftLint（SPM が解決したバイナリ）で .swiftlint.yml を確かめる
+        if: env.APP_KIT_SWIFTLINT == 'true'
+        run: |
+          swiftlint=$(find "$DERIVED_DATA/SourcePackages/artifacts" -type f -name swiftlint -path '*macos*' 2>/dev/null | head -1)
+          if [[ -z "$swiftlint" ]]; then
+            echo "::error::SPM が解決した SwiftLint のバイナリが見つかりません（SwiftLint のビルドのプラグインが無いリポジトリは、.github/app-kit.json の swiftlint を false にしてください）"
+            exit 1
+          fi
+          "$swiftlint" version
+          "$swiftlint" lint --strict --reporter github-actions-logging
+
+      - name: Select simulator
+        if: env.APP_KIT_TEST_PLATFORM != 'macOS'
+        run: echo "SIMULATOR_ID=$("$APP_KIT_DIR/tools/select-simulator.sh" "$APP_KIT_TEST_PLATFORM")" >> "$GITHUB_ENV"
+
+      - name: Build and test
+        # 先頭のプラットフォームでテストを流す。UI テストは共有ランナーで起動待ちに失敗することがあるので、失敗したテストだけ 1 回やり直す
+        # （-test-iterations は初回を含む回数の上限）。並列テストは Simulator の clone を作って遅くなるので切る
+        env:
+          UI_TESTS: ${{ inputs.ui-tests }}
+        run: |
+          options=()
+          if [[ -n "$APP_KIT_UI_TESTS" && "$UI_TESTS" != "true" ]]; then
+            options+=(-skip-testing:"$APP_KIT_UI_TESTS")
+          fi
+          if [[ "$APP_KIT_TEST_PLATFORM" == "macOS" ]]; then
+            destination="platform=macOS"
+            # ランナーには署名の証明書が無いのでアドホック署名にする。App Sandbox を有効にしたままアドホック署名すると、
+            # テストランナーがアプリにつながらずに止まるので、テストのときだけ外す
+            options+=(CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= ENABLE_APP_SANDBOX=NO)
+          else
+            destination="platform=$APP_KIT_TEST_PLATFORM Simulator,id=$SIMULATOR_ID"
+          fi
+          xcodebuild test \
+            -project "$APP_KIT_PROJECT" \
+            -scheme "$APP_KIT_SCHEME" \
+            -destination "$destination" \
+            -derivedDataPath "$DERIVED_DATA" \
+            -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
+            -retry-tests-on-failure \
+            -test-iterations 2 \
+            -parallel-testing-enabled NO \
+            ${options[@]+"${options[@]}"}
+
+      - name: Build for other platforms
+        # 2 つ目からのプラットフォームは、署名なしでビルドだけを確かめる
+        run: |
+          for platform in $APP_KIT_PLATFORMS; do
+            [[ "$platform" == "$APP_KIT_TEST_PLATFORM" ]] && continue
+            case "$platform" in
+              iOS) destination="generic/platform=iOS Simulator" ;;
+              visionOS)
+                destination="generic/platform=visionOS Simulator"
+                xcrun simctl list runtimes -j | jq -e '.runtimes | any(.platform == "visionOS" and .isAvailable)' >/dev/null \
+                  || xcodebuild -downloadPlatform visionOS
+                ;;
+              macOS) destination="platform=macOS" ;;
+            esac
+            echo "::group::$platform"
+            xcodebuild build \
+              -project "$APP_KIT_PROJECT" \
+              -scheme "$APP_KIT_SCHEME" \
+              -destination "$destination" \
+              -derivedDataPath "$DERIVED_DATA" \
+              CODE_SIGNING_ALLOWED=NO
+            echo "::endgroup::"
+          done
+
+      - name: Test Swift packages
+        # アプリと別に持つローカルの Swift Package（.github/app-kit.json の swiftPackages）
+        if: env.APP_KIT_SWIFT_PACKAGES != ''
+        run: |
+          for package in $APP_KIT_SWIFT_PACKAGES; do
+            echo "::group::$package"
+            swift test --package-path "$package"
+            echo "::endgroup::"
+          done
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: TestResults.xcresult
+          path: ${{ runner.temp }}/TestResults.xcresult
+          if-no-files-found: ignore
