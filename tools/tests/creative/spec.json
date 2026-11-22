@@ -1,0 +1,22 @@
+{
+  "v": 1,
+  "layout": "standard",
+  "colors": { "background": "#0B1026", "background2": "#1B2470", "accent": "#5B6CFF", "highlight": "#FFD98A", "text": "#FFFFFF" },
+  "screens": { "header": ["01_home", "02_detail", "03_settings"], "search": ["01_home", "02_detail"] },
+  "locales": [
+    {
+      "locale": "ja",
+      "screenshots": "ja",
+      "appName": "フィクスチャ",
+      "header": { "title": "毎日の記録を*3 秒*で", "subtitle": "開いてすぐ書ける、いちばん軽いメモ" },
+      "search": { "title": "思いついたら、\nすぐ*メモ*", "chips": ["ひと押しで記録", "検索も速い", "広告なし"] }
+    },
+    {
+      "locale": "en-US",
+      "screenshots": "en",
+      "appName": "Fixture",
+      "header": { "title": "Capture your day in *3 seconds*", "subtitle": "The lightest notes app, ready the moment you open it" },
+      "search": { "title": "Think it,\n*note it*", "chips": ["One-tap notes", "Instant search", "No ads"] }
+    }
+  ]
+}
