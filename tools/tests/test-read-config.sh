@@ -78,6 +78,9 @@ else
 fi
 
 expect_error "JSON でない" '{"v":1,' "JSON として読めません"
+expect_error "空白だけ" '  
+' "JSON の値を 1 つだけ"
+expect_error "値が 2 つ" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"]} {"v":1,"project":"B.xcodeproj","scheme":"B","platforms":["iOS"]}' "JSON の値を 1 つだけ"
 expect_error "オブジェクトでない" '[1]' "オブジェクトではありません"
 expect_error "v が違う" '{"v":2,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"]}' "v が 1 ではありません"
 expect_error "project が無い" '{"v":1,"scheme":"App","platforms":["iOS"]}' "project は"

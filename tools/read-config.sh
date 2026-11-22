@@ -26,8 +26,13 @@ if [[ ! -s "$config" ]]; then
   echo "::error::設定のファイルが空です: $config" >&2
   exit 1
 fi
-if ! jq empty "$config" 2>/dev/null; then
+if ! values=$(jq -s 'length' "$config" 2>/dev/null); then
   echo "::error::設定のファイルを JSON として読めません: $config" >&2
+  exit 1
+fi
+# 空白だけのファイルは値が 0 個、オブジェクトを 2 つ並べたファイルは 2 個になり、どちらも項目の確かめを素通りする
+if [[ "$values" != "1" ]]; then
+  echo "::error::設定のファイルには JSON の値を 1 つだけ書いてください（今は ${values} 個）: $config" >&2
   exit 1
 fi
 
