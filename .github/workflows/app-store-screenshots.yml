@@ -61,6 +61,8 @@ jobs:
 
     steps:
       - name: Check inputs
+        # checkout の前なので、working-directory（アプリのディレクトリ）はまだ無い。作業場所の直下で動かす
+        working-directory: .
         env:
           REF: ${{ github.ref }}
           ALLOW_NON_RELEASE: ${{ inputs.allow_non_release }}
