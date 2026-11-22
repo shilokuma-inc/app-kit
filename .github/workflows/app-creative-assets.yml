@@ -1,0 +1,138 @@
+# 各リポジトリの app-store-creative.yml から呼ぶ再利用ワークフロー（クリエイティブアセットを書き出すだけ。上げない）。
+# AskHub の司令塔が、案（文言・色・使う画面。schema/creative-spec.schema.json）を入力 spec に入れて呼ぶ側を workflow_dispatch で起動し、
+# artifact creative-assets（中身は <言語>/product-page-header.png・<言語>/search-results.png）と creative-report（report.json）を取り込む。
+# App Store Connect に上げるのは、人が AskHub で確かめた後の司令塔だけ（app-kit では上げない）。
+#
+# 端末に載せる画面は、6.9 inch の撮影の artifact screenshots-APP_IPHONE_67 から使う（同じ実行か、入力 screenshots-run の実行）。
+# アイコンは呼んだ側の AppStore/app.json の appIcon。Secrets は受け取らない。
+name: app-creative-assets
+
+on:
+  workflow_call:
+    inputs:
+      app-kit-ref:
+        description: 呼んだ app-kit のコミット（uses の @ の後ろと同じ 40 桁）。この版の道具を取り出して使う
+        type: string
+        required: true
+      spec:
+        description: 案（schema/creative-spec.schema.json の形の JSON）
+        type: string
+        required: true
+      screenshots-run:
+        description: 6.9 inch の撮影の artifact（screenshots-APP_IPHONE_67）がある実行の id。空なら同じ実行の artifact を使う
+        type: string
+        default: ''
+      working-directory:
+        description: アプリのあるディレクトリ（リポジトリの直下から）
+        type: string
+        default: '.'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  render:
+    name: render
+    # Chrome・macOS の書体（日本語・中国語・韓国語・タイ語）・xcrun swiftc が要る
+    runs-on: macos-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Check inputs
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+          SCREENSHOTS_RUN: ${{ inputs.screenshots-run }}
+        working-directory: .
+        run: |
+          if [[ ! "$APP_KIT_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::app-kit-ref は app-kit のコミット（40 桁）にしてください: $APP_KIT_REF"
+            exit 1
+          fi
+          if [[ -n "$SCREENSHOTS_RUN" && ! "$SCREENSHOTS_RUN" =~ ^[0-9]{1,20}$ ]]; then
+            echo "::error::screenshots-run は実行の id（数字）にしてください: $SCREENSHOTS_RUN"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get app-kit
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+        run: |
+          dir="$RUNNER_TEMP/app-kit"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/shilokuma-inc/app-kit.git "$APP_KIT_REF"
+          git -C "$dir" checkout -q --detach FETCH_HEAD
+          echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Download screenshots (this run)
+        if: inputs.screenshots-run == ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: screenshots-APP_IPHONE_67
+          path: ${{ runner.temp }}/screenshots
+
+      - name: Download screenshots (earlier run)
+        # 文言だけ直すときは、前の実行で撮った画面を使い回す（撮り直さない）
+        if: inputs.screenshots-run != ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: screenshots-APP_IPHONE_67
+          path: ${{ runner.temp }}/screenshots
+          run-id: ${{ inputs.screenshots-run }}
+          github-token: ${{ github.token }}
+
+      - name: Write spec
+        env:
+          SPEC: ${{ inputs.spec }}
+        run: printf '%s' "$SPEC" > "$RUNNER_TEMP/spec.json"
+
+      - name: Find app icon
+        # app.json の appIcon は、public のリポジトリで誰でも PR に書ける値なので、リポジトリの中の PNG だけを使う
+        run: |
+          set -euo pipefail
+          icon="$(APP_STORE_ROOT="$PWD" python3 "$APP_KIT_DIR/tools/screenshots/app_store_config.py" app appIcon || true)"
+          if [[ -z "$icon" ]]; then
+            echo "app.json に appIcon が無いので、検索結果にアイコンを載せません"
+          elif [[ "$icon" == /* || "$icon" == -* || "$icon" == *..* || "$icon" != *.png || ! -f "$icon" || -L "$icon" ]]; then
+            echo "::warning::appIcon（$icon）はリポジトリの中の PNG ではないので、載せません"
+            icon=""
+          fi
+          echo "APP_ICON=$icon" >> "$GITHUB_ENV"
+
+      - name: Render creative assets
+        run: |
+          set -euo pipefail
+          options=()
+          if [[ -n "$APP_ICON" ]]; then
+            options+=(--icon "$APP_ICON")
+          fi
+          python3 "$APP_KIT_DIR/tools/creative/render_creative.py" \
+            --spec "$RUNNER_TEMP/spec.json" \
+            --screenshots "$RUNNER_TEMP/screenshots" \
+            --out build/creative \
+            --report build/creative-report/report.json \
+            ${options[@]+"${options[@]}"}
+
+      - name: Upload creative assets
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: creative-assets
+          path: ${{ inputs.working-directory }}/build/creative
+          if-no-files-found: error
+
+      - name: Upload report
+        # 書き出せなかったときも、わけ（failure）を司令塔が読めるように上げる
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: creative-report
+          path: ${{ inputs.working-directory }}/build/creative-report
+          if-no-files-found: warn

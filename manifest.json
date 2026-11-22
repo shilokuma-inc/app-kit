@@ -15,6 +15,7 @@
     ".github/ISSUE_TEMPLATE/config.yml",
     ".github/pull_request_template.md",
     ".github/workflows/app-store-screenshots.yml",
+    ".github/workflows/app-store-creative.yml",
     ".github/workflows/archive.yml",
     ".github/workflows/build.yml",
     ".github/workflows/upload.yml",
