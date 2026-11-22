@@ -80,6 +80,11 @@ class ValidateTests(unittest.TestCase):
         codes = sorted(problem["code"] for problem in validate(spec))
         self.assertEqual(codes, ["forbidden-price", "forbidden-price", "forbidden-symbol", "forbidden-url"])
 
+    def test_reports_free_in_japanese_sentence(self) -> None:
+        spec = sample()
+        spec["locales"][0]["search"]["title"] = "ずっと無料で使える"
+        self.assertEqual([problem["code"] for problem in validate(spec)], ["forbidden-price"])
+
     def test_reports_low_contrast(self) -> None:
         spec = sample()
         spec["colors"]["text"] = "#202040"

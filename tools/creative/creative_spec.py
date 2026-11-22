@@ -47,7 +47,7 @@ FORBIDDEN = [
     ("url", re.compile(r"(https?://|www\.|\b[a-z0-9-]+\.(com|net|org|jp|app|io)\b)", re.IGNORECASE), "URL"),
     ("email", re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"), "メールアドレス"),
     ("symbol", re.compile(r"[©®™℗]"), "著作権・商標の記号"),
-    ("price", re.compile(r"([¥$€£₩₹]\s?\d|\d\s?(円|ドル|元|원)|\b(free|無料)\b)", re.IGNORECASE), "価格"),
+    ("price", re.compile(r"([¥$€£₩₹]\s?\d|\d\s?(円|ドル|元|원)|\bfree\b|無料)", re.IGNORECASE), "価格"),
 ]
 
 
