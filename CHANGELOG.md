@@ -10,6 +10,11 @@
 - クリエイティブアセット（App Store のプロダクトページのヘッダー・検索結果の画像）を書き出す再利用ワークフロー `app-creative-assets.yml` と、呼ぶ側 `app-store-creative.yml` を足した。AskHub の司令塔が案（文言・色・使う画面）を入力で渡して起動し、artifact `creative-assets`・`creative-report` を取り込む。画像はリポジトリにコミットしない（ask-hub-apple の `docs/renewal/creative-assets.md`）
 - 書き出しの雛形と道具（`tools/creative/`）と、案の形（`schema/creative-spec.schema.json`）を足した。文字は安全領域に収め、はみ出し・安全領域の外の文字・Apple の決まりに合わない文言を `report.json` に出す
 
+## v1.1.1（2026-11-23）
+
+- 呼ぶ側の撮影のワークフローで、入力 `max_parallel` を数にして（`fromJSON`）再利用ワークフローに渡すようにした。v1.1.0 では、API で起動すると number の入力が文字列のまま渡り、実行がジョブを作れずに「Unexpected value '1'」で落ちていた（`max_parallel` を送らないときも）
+- 写すファイルの確かめに、呼ぶ側の number の入力を `fromJSON` で渡しているかを足した
+
 ## v1.1.0（2026-11-23）
 
 - 撮影の再利用ワークフローに、入力 `max_parallel`（撮影に同時に使う macOS ランナーの数。1〜5、既定 1）を足した。既定のままなら、今までと同じく表示サイズを 1 本ずつ撮る

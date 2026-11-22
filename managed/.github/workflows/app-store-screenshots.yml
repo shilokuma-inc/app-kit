@@ -48,4 +48,5 @@ jobs:
       languages: ${{ inputs.languages }}
       upload: ${{ inputs.upload }}
       allow_non_release: ${{ inputs.allow_non_release }}
-      max_parallel: ${{ inputs.max_parallel }}
+      # API の workflow_dispatch では number の入力も文字列で届き、そのままでは再利用ワークフローの number の入力に断られるので、数にして渡す
+      max_parallel: ${{ fromJSON(inputs.max_parallel) }}
