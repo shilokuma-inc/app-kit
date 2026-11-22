@@ -34,9 +34,11 @@ else
 fi
 pinned=true
 for workflow in "$out"/.github/workflows/*.yml; do
+  # app-kit を呼ぶジョブ（uses:）ごとに、uses: と app-kit-ref の 2 か所に同じ版のコミットがあること
+  uses_lines=$(grep -c 'uses: shilokuma-inc/app-kit/' "$workflow" || true)
   ref_lines=$(grep -c '0123456789abcdef0123456789abcdef01234567' "$workflow" || true)
-  if [[ "$ref_lines" -ne 2 ]]; then
-    echo "FAIL $(basename "$workflow"): uses: と app-kit-ref の 2 か所に版のコミットが無い（$ref_lines か所）"
+  if [[ "$uses_lines" -lt 1 || "$ref_lines" -ne $((uses_lines * 2)) ]]; then
+    echo "FAIL $(basename "$workflow"): app-kit を呼ぶ $uses_lines か所の uses: と app-kit-ref に版のコミットがそろっていない（$ref_lines か所）"
     failures=$((failures + 1))
     pinned=false
   fi

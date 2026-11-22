@@ -1,0 +1,298 @@
+<!doctype html>
+<!--
+  App Store のクリエイティブアセット（プロダクトページのヘッダー / 検索結果）の雛形。
+  tools/creative/render_creative.py が、同じフォルダに spec.js（案）・screens/<撮影の言語>/<画面>.png・icon.png を置き、
+  Chrome で creative.html?kind=productPageHeader&locale=ja のように開いて実寸で書き出す。
+
+  リポジトリごとの値（文言・色・使う画面・アプリ名）は案（schema/creative-spec.schema.json）だけから読む。
+  案の文字は文字として描く（textContent）。HTML・CSS は案から受け付けない。
+
+  方針（https://developer.apple.com/app-store/asset-best-practices/）
+  - 文字は安全領域（端末によらず切れない範囲）の中に収める。端末の画像は飾りなので、安全領域の外にはみ出してよい
+  - ヘッダー（21:9）: アプリのいちばんの価値を 1 つだけ伝える
+  - 検索結果（3:2）: 何をするアプリかが一目でわかるよう、実際の画面と主な機能を見せる
+  - 強いグラデーション・光彩・意味の無い飾りは使わない（ask-hub-apple の docs/renewal/release.md の「デザインの方針」）
+
+  書き終えたら、検査の結果を body の data-report に JSON で書く（render_creative.py が --dump-dom で読む）。
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --font: system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  }
+  /* 言語ごとの書体。どれも macOS に標準で入っている */
+  :lang(ja) { --font: "Hiragino Sans", "Hiragino Kaku Gothic ProN", system-ui, sans-serif; }
+  :lang(zh-Hans), :lang(zh-CN) { --font: "PingFang SC", system-ui, sans-serif; }
+  :lang(zh-Hant), :lang(zh-TW) { --font: "PingFang TC", system-ui, sans-serif; }
+  :lang(zh-HK) { --font: "PingFang HK", "PingFang TC", system-ui, sans-serif; }
+  :lang(ko) { --font: "Apple SD Gothic Neo", system-ui, sans-serif; }
+  :lang(th) { --font: "Thonburi", "Sukhumvit Set", system-ui, sans-serif; }
+  :lang(ar) { --font: "SF Arabic", "Geeza Pro", system-ui, sans-serif; }
+  :lang(he) { --font: "SF Hebrew", "Arial Hebrew", system-ui, sans-serif; }
+  :lang(hi) { --font: "Kohinoor Devanagari", "Devanagari Sangam MN", system-ui, sans-serif; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: var(--background);
+    color: var(--text);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  .canvas { position: relative; width: 100vw; height: 100vh; overflow: hidden;
+    background: linear-gradient(170deg, var(--background) 0%, var(--background-2) 100%); }
+
+  /* 端末は 6.9 inch の iPhone に似せる。枠の太さと角の丸みは、端末の幅から phone() で px に直して決める
+     （% の padding は親の幅、% の border-radius は縦横で別の長さに対する割合になるため使わない） */
+  .phone { position: absolute;
+    background: linear-gradient(135deg, #6b6e78 0%, #33353c 18%, #1b1c21 46%, #2c2e35 70%, #5c5f69 100%);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.55); }
+  .phone .bezel { background: #000; }
+  .phone img { display: block; width: 100%; }
+  .phone .button { position: absolute; background: linear-gradient(90deg, #2a2c32, #6a6d77 45%, #3a3c43); }
+
+  .text { position: absolute; overflow-wrap: normal; word-break: auto-phrase; }
+  .title { font-weight: 800; line-height: 1.16; letter-spacing: -0.01em; text-wrap: balance; }
+  .subtitle { font-weight: 500; line-height: 1.3; color: var(--text-2); text-wrap: balance; }
+  .center { text-align: center; }
+  em { font-style: normal; color: var(--highlight); }
+
+  .column { position: absolute; display: flex; flex-direction: column; align-items: flex-start; }
+  .brand { display: flex; align-items: center; gap: 0.5em; font-weight: 800; color: var(--highlight); line-height: 1.2; }
+  .brand img { height: 1.5em; width: 1.5em; border-radius: 22.5%; }
+  .chips { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5em; }
+  .chip { display: inline-flex; align-items: center; gap: 0.55em; max-width: 100%;
+    padding: 0.4em 0.9em 0.45em 0.6em; border-radius: 999px; font-weight: 700; line-height: 1.2;
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: inset 0 0 0 0.05em color-mix(in srgb, var(--accent) 70%, white 10%); }
+  /* 長い語は折り返さずにはみ出させ、検査で見つける（min-width: 0 で、はみ出しを span の中に起こす） */
+  .chip span { min-width: 0; }
+  .chip i { font-style: normal; display: grid; place-items: center; flex: none; width: 1.4em; height: 1.4em; border-radius: 50%;
+    background: var(--accent); color: var(--background); font-size: 0.8em; }
+</style>
+</head>
+<body>
+<div class="canvas" id="canvas"></div>
+<script src="spec.js"></script>
+<script>
+  "use strict";
+  // 寸法と安全領域（Apple の Creative assets specifications。2026-11-23 に確かめた）
+  const KINDS = {
+    productPageHeader: { width: 3840, height: 1646, safe: { x: 1097, y: 493, w: 1646, h: 661 } },
+    searchResults: { width: 3840, height: 2560, safe: { x: 836, y: 765, w: 2168, h: 1030 } },
+  };
+  const params = new URLSearchParams(location.search);
+  const kindName = params.get("kind");
+  const localeName = params.get("locale");
+  const report = { kind: kindName, locale: localeName, problems: [], texts: [] };
+  const problem = (code, message) => report.problems.push({ code, message });
+  const finish = () => document.body.setAttribute("data-report", JSON.stringify(report));
+
+  const canvas = document.getElementById("canvas");
+  const add = (parent, tag, className) => {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    parent.appendChild(element);
+    return element;
+  };
+
+  // 案の文字を描く。* で囲んだところを強調し、改行を保つ。HTML としては読まない
+  const setText = (element, text) => {
+    text.split("*").forEach((part, index) => {
+      const target = index % 2 === 1 ? add(element, "em") : element;
+      part.split("\n").forEach((line, lineIndex) => {
+        if (lineIndex > 0) add(target, "br");
+        target.appendChild(document.createTextNode(line));
+      });
+    });
+  };
+
+  // 端末の寸法（端末の幅に対する割合）。6.9 inch の iPhone の実物に合わせる
+  const FRAME = 0.0115;
+  const BEZEL = 0.0165;
+  const SCREEN_RADIUS = 62 / 440;
+  const BUTTONS = [["left", 0.185, 0.04], ["left", 0.255, 0.065], ["left", 0.34, 0.065], ["right", 0.27, 0.105]];
+  const images = [];
+  const phone = (src, centerX, top, width, rotate, z) => {
+    const frame = width * FRAME;
+    const bezel = width * BEZEL;
+    const screenRadius = (width - 2 * (frame + bezel)) * SCREEN_RADIUS;
+    const bezelRadius = screenRadius + bezel;
+    const outerRadius = bezelRadius + frame;
+    const thickness = Math.max(2, width * 0.0065);
+    const body = add(canvas, "div", "phone");
+    Object.assign(body.style, {
+      left: `${centerX - width / 2}px`, top: `${top}px`, width: `${width}px`, padding: `${frame}px`,
+      borderRadius: `${outerRadius}px`, transform: `rotate(${rotate}deg)`, zIndex: String(z),
+      filter: `drop-shadow(0 ${width * 0.06}px ${width * 0.08}px rgba(0, 0, 0, 0.45))`,
+    });
+    for (const [side, buttonTop, length] of BUTTONS) {
+      const button = add(body, "i", "button");
+      Object.assign(button.style, {
+        [side]: `${-thickness}px`, top: `${buttonTop * 100}%`, height: `${length * 100}%`, width: `${thickness + frame / 2}px`,
+        borderRadius: side === "left" ? `${thickness}px 0 0 ${thickness}px` : `0 ${thickness}px ${thickness}px 0`,
+      });
+    }
+    const screen = add(body, "div", "bezel");
+    Object.assign(screen.style, { padding: `${bezel}px`, borderRadius: `${bezelRadius}px` });
+    const image = add(screen, "img");
+    image.src = src;
+    image.style.borderRadius = `${screenRadius}px`;
+    images.push({ image, src });
+    return body;
+  };
+
+  // 文字の箱を、幅と行数に収まるまで小さくする。収まらなければ最小の大きさのまま返し、record で知らせる
+  const fit = (element, { width, maxSize, minSize, maxLines }) => {
+    element.style.width = `${width}px`;
+    let size = maxSize;
+    for (;;) {
+      element.style.fontSize = `${size}px`;
+      const lineHeight = parseFloat(getComputedStyle(element).lineHeight);
+      const lines = Math.round(element.scrollHeight / lineHeight);
+      const fits = element.scrollWidth <= width + 1 && lines <= maxLines;
+      if (fits || size <= minSize) return { size, lines, fits };
+      size = Math.max(minSize, Math.floor(size * 0.95));
+    }
+  };
+  const record = (name, result, { width, minSize, maxLines }) => {
+    report.texts.push({ name, ...result });
+    if (!result.fits) problem("text-overflow", `${name} が ${maxLines} 行・幅 ${width}px に収まりません（最小の ${minSize}px でも）`);
+  };
+
+  // 文字が安全領域の中にあるか
+  const checkSafe = (name, element, safe) => {
+    const rect = element.getBoundingClientRect();
+    const inside = rect.left >= safe.x - 1 && rect.top >= safe.y - 1 &&
+      rect.right <= safe.x + safe.w + 1 && rect.bottom <= safe.y + safe.h + 1;
+    if (!inside) {
+      problem("outside-safe-area",
+        `${name} が安全領域の外にあります（${Math.round(rect.left)},${Math.round(rect.top)} から ${Math.round(rect.width)}x${Math.round(rect.height)}）`);
+    }
+  };
+
+  const header = (copy, screens, safe) => {
+    const W = KINDS.productPageHeader.width;
+    // 見出しと一文は、安全領域の上から中央にそろえて置く
+    const title = add(canvas, "div", "text title center");
+    setText(title, copy.title);
+    title.style.left = `${safe.x}px`;
+    title.style.top = `${safe.y + 16}px`;
+    const titleLimits = { width: safe.w, maxSize: 132, minSize: 80, maxLines: 2 };
+    record("header.title", fit(title, titleLimits), titleLimits);
+    let bottom = title.offsetTop + title.offsetHeight;
+    const texts = [["header.title", title]];
+    if (copy.subtitle) {
+      const subtitle = add(canvas, "div", "text subtitle center");
+      setText(subtitle, copy.subtitle);
+      subtitle.style.left = `${safe.x}px`;
+      subtitle.style.top = `${bottom + 24}px`;
+      const subtitleLimits = { width: safe.w, maxSize: 60, minSize: 44, maxLines: 2 };
+      record("header.subtitle", fit(subtitle, subtitleLimits), subtitleLimits);
+      bottom = subtitle.offsetTop + subtitle.offsetHeight;
+      texts.push(["header.subtitle", subtitle]);
+    }
+    // 端末は文字の下から生やす（下端は画像の外に切れてよい）。画面が 2 つ以上あれば左右にも置く
+    const phoneTop = Math.min(bottom + 56, safe.y + safe.h - 160);
+    if (screens.length > 1) {
+      phone(screens[1], W / 2 - 860, phoneTop + 150, 520, -7, 1);
+      phone(screens[screens.length > 2 ? 2 : 1], W / 2 + 860, phoneTop + 150, 520, 7, 1);
+    }
+    phone(screens[0], W / 2, phoneTop, 600, 0, 2);
+    return texts;
+  };
+
+  const search = (copy, screens, safe, appName) => {
+    // 左に何のアプリかと主な機能、右に実際の画面。文字の列は安全領域の左側に収める
+    const columnWidth = 1080;
+    const column = add(canvas, "div", "column");
+    Object.assign(column.style, { left: `${safe.x}px`, top: `${safe.y}px`, width: `${columnWidth}px` });
+    const brand = add(column, "div", "brand text");
+    brand.style.position = "static";
+    if (window.CREATIVE_ICON) {
+      const icon = add(brand, "img");
+      icon.src = "icon.png";
+      images.push({ image: icon, src: "icon.png" });
+    }
+    const name = add(brand, "span");
+    name.textContent = appName;
+    const title = add(column, "div", "text title");
+    title.style.position = "static";
+    setText(title, copy.title);
+    const chips = add(column, "div", "chips");
+    (copy.chips || []).forEach((text, index) => {
+      const chip = add(chips, "div", "chip");
+      add(chip, "i").textContent = String(index + 1);
+      const label = add(chip, "span");
+      setText(label, text);
+    });
+    // 列ぜんたいが安全領域の高さに収まるまで、同じ割合で小さくする
+    let scale = 1;
+    let titleLimits;
+    let titleResult;
+    for (;;) {
+      brand.style.fontSize = `${80 * scale}px`;
+      brand.style.marginBottom = `${56 * scale}px`;
+      titleLimits = { width: columnWidth, maxSize: Math.round(150 * scale), minSize: 88, maxLines: 3 };
+      titleResult = fit(title, titleLimits);
+      chips.style.fontSize = `${70 * scale}px`;
+      chips.style.marginTop = `${64 * scale}px`;
+      if (column.offsetHeight <= safe.h || scale <= 0.7) break;
+      scale = Math.round((scale - 0.05) * 100) / 100;
+    }
+    record("search.title", titleResult, titleLimits);
+    chips.querySelectorAll(".chip span").forEach((label, index) => {
+      if (label.scrollWidth > label.clientWidth + 1) {
+        problem("text-overflow", `search.chips[${index}] が列の幅 ${columnWidth}px に収まりません`);
+      }
+    });
+    report.scale = scale;
+    const right = safe.x + safe.w;
+    if (screens.length > 1) {
+      phone(screens[1], right + 230, safe.y - 40, 700, 6, 1);
+    }
+    phone(screens[0], right - 400, safe.y - 160, 780, -3, 2);
+    const texts = [["search.brand", brand], ["search.title", title]];
+    chips.querySelectorAll(".chip").forEach((chip, index) => texts.push([`search.chips[${index}]`, chip]));
+    return texts;
+  };
+
+  try {
+    const spec = window.CREATIVE_SPEC;
+    const kind = KINDS[kindName];
+    if (!spec || !kind) throw new Error(`案（spec.js）か種類（${kindName}）がありません`);
+    const locale = spec.locales.find((item) => item.locale === localeName);
+    if (!locale) throw new Error(`案に ${localeName} の文言がありません`);
+    document.documentElement.lang = localeName;
+    if (/^(ar|he|fa|ur)(-|$)/.test(localeName)) document.documentElement.dir = "rtl";
+    const colors = spec.colors;
+    const root = document.documentElement.style;
+    root.setProperty("--background", colors.background);
+    root.setProperty("--background-2", colors.background2 || colors.background);
+    root.setProperty("--accent", colors.accent);
+    root.setProperty("--highlight", colors.highlight || colors.accent);
+    root.setProperty("--text", colors.text);
+    root.setProperty("--text-2", `color-mix(in srgb, ${colors.text} 76%, transparent)`);
+
+    const names = kindName === "productPageHeader" ? spec.screens.header : spec.screens.search;
+    const screens = names.map((name) => `screens/${locale.screenshots}/${name}.png`);
+    const texts = kindName === "productPageHeader"
+      ? header(locale.header, screens, kind.safe)
+      : search(locale.search, screens, kind.safe, locale.appName);
+
+    window.addEventListener("load", () => {
+      for (const [name, element] of texts) checkSafe(name, element, kind.safe);
+      for (const { image, src } of images) {
+        if (!image.complete || image.naturalWidth === 0) problem("image-missing", `${src} を読めません`);
+      }
+      finish();
+    });
+  } catch (error) {
+    problem("render-error", String(error && error.message || error));
+    finish();
+  }
+</script>
+</body>
+</html>

@@ -36,6 +36,13 @@ jobs:
       - name: ShellCheck
         run: shellcheck tools/*.sh tools/tests/*.sh tools/screenshots/*.sh
 
+      - name: Test creative spec
+        run: python3 tools/tests/test_creative_spec.py
+
+      - name: Validate creative spec schema
+        # 見本の案が schema/creative-spec.schema.json に合うこと（tools/creative/creative_spec.py と同じ形を書いているか）
+        run: pipx run check-jsonschema==0.33.0 --schemafile schema/creative-spec.schema.json tools/tests/creative/spec.json
+
       - name: actionlint
         run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.12 -color
 
@@ -86,3 +93,83 @@ jobs:
       app-kit-ref: ${{ github.sha }}
       export: false
       working-directory: fixtures/App
+
+  creative-render:
+    # クリエイティブアセットの書き出しの道具を、仮の画面と見本の案で確かめる（はみ出し・無い画面・再現性）
+    name: creative-render
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test render_creative.py
+        run: bash tools/tests/test-creative-render.sh
+
+  creative-screens:
+    # 再利用ワークフロー（app-creative-assets.yml）に渡す、6.9 inch の撮影の artifact の代わり
+    name: creative-screens
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      spec: ${{ steps.spec.outputs.spec }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Make screens
+        run: python3 tools/tests/creative/make_screens.py "$RUNNER_TEMP/screens" ja,en 01_home,02_detail,03_settings
+
+      - name: Upload screens as artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots-APP_IPHONE_67
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: error
+
+      - name: Read spec
+        id: spec
+        run: echo "spec=$(jq -c . tools/tests/creative/spec.json)" >> "$GITHUB_OUTPUT"
+
+  creative:
+    # 呼ぶ側と同じく、案を文字列の入力で渡して書き出す
+    needs: creative-screens
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/app-creative-assets.yml
+    with:
+      app-kit-ref: ${{ github.sha }}
+      spec: ${{ needs.creative-screens.outputs.spec }}
+      working-directory: fixtures/App
+
+  creative-check:
+    # 書き出した artifact の形（司令塔が取り込む形）を確かめる
+    needs: creative
+    name: creative-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download creative assets
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: creative-assets
+          path: ${{ runner.temp }}/creative
+
+      - name: Download report
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: creative-report
+          path: ${{ runner.temp }}/creative-report
+
+      - name: Check artifacts
+        run: python3 tools/tests/creative/check_report.py "$RUNNER_TEMP/creative-report/report.json" "$RUNNER_TEMP/creative" ja,en-US
