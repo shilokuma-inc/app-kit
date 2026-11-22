@@ -101,7 +101,8 @@ jobs:
           icon="$(APP_STORE_ROOT="$PWD" python3 "$APP_KIT_DIR/tools/screenshots/app_store_config.py" app appIcon || true)"
           if [[ -z "$icon" ]]; then
             echo "app.json に appIcon が無いので、検索結果にアイコンを載せません"
-          elif [[ "$icon" == /* || "$icon" == -* || "$icon" == *..* || "$icon" != *.png || ! -f "$icon" || -L "$icon" ]]; then
+          elif [[ "$icon" == *$'\n'* || "$icon" == *$'\r'* || "$icon" == /* || "$icon" == -* || "$icon" == *..* || "$icon" != *.png \
+                  || ! -f "$icon" || -L "$icon" ]]; then
             echo "::warning::appIcon（$icon）はリポジトリの中の PNG ではないので、載せません"
             icon=""
           fi
