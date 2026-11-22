@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 
 SIZES = {"product-page-header.png": (3840, 1646), "search-results.png": (3840, 2560)}
+#: ファイルの名前 → report.json の種類（AskHub の司令塔が読む形）
+KINDS = {"product-page-header.png": "productPageHeader", "search-results.png": "searchResults"}
 
 
 def main() -> int:
@@ -29,6 +31,10 @@ def main() -> int:
             if not path.is_file():
                 failures.append(f"{locale}/{name} がありません")
                 continue
+            records = [image for image in report.get("images", [])
+                       if image.get("locale") == locale and image.get("kind") == KINDS[name] and image.get("file") == f"{locale}/{name}"]
+            if len(records) != 1:
+                failures.append(f"report.json に {locale}/{name} の記録が 1 つでない（{len(records)} 個）")
             head = path.read_bytes()[:26]
             width, height = struct.unpack(">II", head[16:24])
             if (width, height) != size or head[25] != 2:
