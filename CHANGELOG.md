@@ -5,6 +5,11 @@
 
 ## Unreleased
 
+## v1.0.1（2026-11-22）
+
+- 撮影で、同じ表示サイズを重ねて指定されても、同じジョブと artifact を 2 つ作らないようにした
+- 呼ぶ側の撮影のワークフローに、撮影の設定（プロジェクト・Scheme・画面・表示サイズ・言語）は `AppStore/` の JSON で決めることを書いた
+
 ## v1.0.0（2026-11-22）
 
 最初の版。template-app-ios の 2026-11-22 の `_build.yml`・`_archive.yml`・`app-store-screenshots.yml` と道具を、各リポジトリから呼べる形にした。

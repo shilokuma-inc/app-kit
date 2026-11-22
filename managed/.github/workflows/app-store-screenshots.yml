@@ -5,6 +5,8 @@ name: Screenshots/App Store
 # App Store のスクショを撮る（上げない）。AskHub の司令塔が release ブランチで起動し、artifact screenshots-<表示サイズ> を取り込む。
 # App Store Connect に上げるのは、人が AskHub で確かめた後の司令塔だけ。
 # このファイルの名前と入力は、司令塔のビルドの設定（storeScreenshots の workflow）と合わせてある。変えるときは司令塔と一緒に変える
+# 撮影でビルドするプロジェクトと Scheme は AppStore/app.json、撮る画面と表示サイズは AppStore/screenshots.json、言語は AppStore/languages.json で決める
+# （.github/app-kit.json の project・scheme は、撮影では読まない）
 on:
   workflow_dispatch:
     inputs:

@@ -216,7 +216,8 @@ def matrix(selected: list[str] | None = None) -> dict:
 
     縮めて作る表示サイズだけを指定したときも、元の表示サイズは撮る必要があるので capture に足す。
     """
-    names = display_type_names(selected)
+    # 同じ表示サイズを重ねて指定されても、ジョブ（と同じ名前の artifact）を 2 つ作らないよう、指定の順のまま重なりを除く
+    names = list(dict.fromkeys(display_type_names(selected)))
     capture: list[str] = []
     derive: list[dict] = []
     for name in names:
