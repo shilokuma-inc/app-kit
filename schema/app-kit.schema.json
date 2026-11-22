@@ -4,9 +4,16 @@
   "title": "app-kit の各リポジトリの設定（.github/app-kit.json）",
   "description": "再利用ワークフローが呼んだ側の checkout から読む。読む側（tools/read-config.sh）は知らない欄を読み飛ばす（前の版に戻したときにも読めるように）",
   "type": "object",
-  "required": ["v", "project", "scheme", "platforms"],
+  "required": [
+    "v",
+    "project",
+    "scheme",
+    "platforms"
+  ],
   "properties": {
-    "v": { "const": 1 },
+    "v": {
+      "const": 1
+    },
     "project": {
       "description": "リポジトリの直下（working-directory）からの .xcodeproj のパス。XcodeGen で作るリポジトリは、作った後のパス",
       "type": "string",
@@ -22,20 +29,35 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "enum": ["iOS", "macOS", "visionOS"] }
+      "items": {
+        "enum": [
+          "iOS",
+          "macOS",
+          "visionOS"
+        ]
+      }
     },
     "generate": {
       "description": "XcodeGen で .xcodeproj を作るリポジトリは \"xcodegen\"",
-      "enum": [null, "xcodegen"]
+      "enum": [
+        null,
+        "xcodegen"
+      ]
     },
     "uiTests": {
       "description": "UI テストのターゲット。作業ブランチへの push では飛ばす。無ければ null",
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+-]*$"
     },
     "xcodeVersion": {
       "description": "app-kit の版の既定と違う Xcode を使うときだけ書く（maxim-lobanov/setup-xcode に渡す）",
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"
     },
     "swiftlint": {
@@ -46,17 +68,45 @@
       "description": "swift test で確かめるローカルの Swift Package のパス（リポジトリの直下から。空白を含まない）",
       "type": "array",
       "uniqueItems": true,
-      "items": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+/-]*$" }
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+/-]*$"
+      }
     },
     "archive": {
       "description": "Archive・Upload の設定（app-archive.yml が読む）",
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "platforms": {
+          "description": "Archive・Upload するプラットフォーム。省くと platforms の先頭だけ。macOS はまだ扱わない（app-archive.yml が断る）",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "iOS",
+              "macOS",
+              "visionOS"
+            ]
+          }
+        },
+        "googleServiceInfo": {
+          "description": "Secret GOOGLE_SERVICE_INFO_PLIST_BASE64 を書き出す GoogleService-Info.plist のパス（リポジトリの直下から）。Secret が無ければ書き出さずに注釈で知らせる。使わなければ null",
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+/-]*/GoogleService-Info\\.plist$"
+        }
+      }
     },
     "unmanaged": {
       "description": "AskHub の司令塔が写すファイルのうち、このリポジトリでは配らないもの（司令塔が読む）",
       "type": "array",
       "uniqueItems": true,
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     }
   }
 }

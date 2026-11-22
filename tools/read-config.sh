@@ -55,7 +55,14 @@ problems=$(jq -r '
     (if .xcodeVersion != null and ((.xcodeVersion | type == "string" and test("^[0-9]+(\\.[0-9]+){0,2}$")) | not) then "xcodeVersion の形が合いません（\(.xcodeVersion | tojson)）" else empty end),
     (if .swiftlint != null and (.swiftlint | type != "boolean") then "swiftlint は true か false にしてください（\(.swiftlint | tojson)）" else empty end),
     (if .swiftPackages != null and ((.swiftPackages | type == "array" and all(.[]; is_path) and (unique | length) == length) | not)
-      then "swiftPackages はリポジトリの中のパスの並びにしてください（\(.swiftPackages | tojson)）" else empty end)
+      then "swiftPackages はリポジトリの中のパスの並びにしてください（\(.swiftPackages | tojson)）" else empty end),
+    (if .archive != null and (.archive | type != "object") then "archive はオブジェクトにしてください（\(.archive | tojson)）" else empty end),
+    (if (.archive | type == "object") and .archive.platforms != null
+        and ((.archive.platforms | type == "array" and length > 0 and all(.[]; . == "iOS" or . == "macOS" or . == "visionOS") and (unique | length) == length) | not)
+      then "archive.platforms は iOS・macOS・visionOS のうち 1 つ以上の重ならない並びにしてください（\(.archive.platforms | tojson)）" else empty end),
+    (if (.archive | type == "object") and .archive.googleServiceInfo != null
+        and ((.archive.googleServiceInfo | is_path and endswith("/GoogleService-Info.plist")) | not)
+      then "archive.googleServiceInfo は、アプリのフォルダの中の GoogleService-Info.plist のパスにしてください（\(.archive.googleServiceInfo | tojson)）" else empty end)
   ] | .[] end
 ' "$config")
 if [[ -n "$problems" ]]; then
@@ -74,5 +81,8 @@ jq -r --arg default_xcode "$DEFAULT_XCODE_VERSION" '
   "APP_KIT_UI_TESTS=\(.uiTests // "")",
   "APP_KIT_XCODE_VERSION=\(.xcodeVersion // $default_xcode)",
   "APP_KIT_SWIFTLINT=\(if .swiftlint == false then "false" else "true" end)",
-  "APP_KIT_SWIFT_PACKAGES=\((.swiftPackages // []) | join(" "))"
+  "APP_KIT_SWIFT_PACKAGES=\((.swiftPackages // []) | join(" "))",
+  "APP_KIT_ARCHIVE_PLATFORMS=\((.archive.platforms // [.platforms[0]]) | join(" "))",
+  "APP_KIT_ARCHIVE_PLATFORMS_JSON=\((.archive.platforms // [.platforms[0]]) | tojson)",
+  "APP_KIT_GOOGLE_SERVICE_INFO=\(.archive.googleServiceInfo // "")"
 ' "$config"
