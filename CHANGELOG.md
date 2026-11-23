@@ -8,7 +8,7 @@
 ## v1.5.0（2026-11-24）
 
 - Archive に entitlements を入れる手順と、書き出した IPA・pkg の確かめを、本体だけでなく、中のバンドル（App Extension・App Clip・system extension・XPC サービス。`.framework` の中は除く）すべてに広げた。v1.4.0 までは本体しか扱わず、ウィジェットなどの App Groups が配信ビルドから抜けても Upload まで通っていた
-  - 中のバンドルのターゲットは、`-alltargets` のビルドの設定から製品の名前で選ぶ（同じ名前のターゲットが 2 つ以上なら、Bundle ID とプラットフォームで絞る）。内側から署名し、内側を署名し直したら外側も署名し直す
+  - 中のバンドルのターゲットは、`-alltargets` のビルドの設定から製品の名前で選ぶ（Archive のバンドルと Bundle ID が合うものに絞り、まだ 2 つ以上ならプラットフォームで絞る）。内側から署名し、内側を署名し直したら外側も署名し直す
   - 書き出した IPA・pkg の各バンドルに、Archive の署名のキーと、ソースの entitlements（`CODE_SIGN_ENTITLEMENTS` を展開したもの）のキーがすべてあるかを確かめる。今までは Archive の署名と比べるだけで、Archive に入れ損ねると通っていた
   - macOS の中のバンドルには entitlement を足さない（Archive のアドホック署名のまま）。中のバンドルの entitlements のファイルに、アドホック署名の Archive に入らない項目があれば止める
 - バンドルごとの entitlements（Archive と書き出したもの）を、artifact `entitlements-<プラットフォーム>`（JSON。IPA・pkg は上げない）と Job Summary に出すようにした

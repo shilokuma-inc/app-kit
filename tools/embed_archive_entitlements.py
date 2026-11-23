@@ -115,7 +115,8 @@ def app_build_settings(entries: list[dict], product_name: str) -> dict[str, str]
 def target_settings(entries: list[dict], bundle: Path, sdk: str, native) -> dict[str, str]:
     """`-alltargets` の結果（entries）から、本体の中のバンドル（`Widget.appex` など）を作るターゲットの設定を選ぶ。
 
-    製品の名前で選び、2 つ以上なら Archive のバンドルの Bundle ID で、まだ 2 つ以上ならターゲットのプラットフォームで絞る。
+    製品の名前で選び、Archive のバンドルの Bundle ID（Info.plist の CFBundleIdentifier）が合うものに絞る（候補が 1 つでも見る。
+    別のターゲットの entitlements で署名しないように）。まだ 2 つ以上なら、ターゲットのプラットフォームで絞る。
     iOS と macOS の別のターゲットが、同じ名前・同じ Bundle ID のバンドルを作ることがある（kawarin-apple の `Kawarin.app`）。
     `-sdk` を付けた設定では、どのターゲットもそのプラットフォームの値（`SUPPORTED_PLATFORMS` も）になるので、
     プラットフォームは `-sdk` なしの設定（native() が返す）で見る。見つからない・1 つに決まらなければ止める（黙って飛ばさない）。
@@ -126,8 +127,8 @@ def target_settings(entries: list[dict], bundle: Path, sdk: str, native) -> dict
             # -alltargets は先頭のターゲットを 2 回出すので、ターゲットの名前で 1 つにまとめる
             candidates.setdefault(entry.get("target", ""), entry)
     matches = list(candidates.values())
-    if len(matches) > 1:
-        bundle_id = bundle_info(bundle).get("CFBundleIdentifier")
+    bundle_id = bundle_info(bundle).get("CFBundleIdentifier")
+    if bundle_id:
         matches = [entry for entry in matches if entry["buildSettings"].get("PRODUCT_BUNDLE_IDENTIFIER") == bundle_id]
     if len(matches) > 1:
         platforms = {entry.get("target", ""): entry.get("buildSettings", {}).get("SUPPORTED_PLATFORMS", "").split()
@@ -135,7 +136,8 @@ def target_settings(entries: list[dict], bundle: Path, sdk: str, native) -> dict
         matches = [entry for entry in matches if sdk in platforms.get(entry.get("target", ""), [])]
     if len(matches) != 1:
         names = "、".join(sorted(candidates)) or "なし"
-        raise fail(f"{bundle.name} を作るターゲットが 1 つに決まりません（製品の名前が同じターゲット: {names}）")
+        raise fail(f"{bundle.name}（Bundle ID: {bundle_id or '不明'}）を作るターゲットが 1 つに決まりません"
+                   f"（製品の名前が同じターゲット: {names}）")
     return matches[0]["buildSettings"]
 
 

@@ -159,7 +159,9 @@ class TargetSettingsTests(unittest.TestCase):
 
     def test_picks_by_product_name(self):
         # -alltargets は先頭のターゲットを 2 回出すので、同じターゲットは 1 つに数える
-        entries = [settings_entry("App.app"), settings_entry("Widget.appex", CODE_SIGN_ENTITLEMENTS="W.entitlements"),
+        entries = [settings_entry("App.app"),
+                   settings_entry("Widget.appex", CODE_SIGN_ENTITLEMENTS="W.entitlements",
+                                  PRODUCT_BUNDLE_IDENTIFIER="jp.shilokuma.App.Widget"),
                    settings_entry("App.app")]
         self.assertEqual(self.select(entries, self.bundle("Widget.appex"))["CODE_SIGN_ENTITLEMENTS"], "W.entitlements")
         self.assertEqual(self.native_calls, 0)
@@ -169,6 +171,20 @@ class TargetSettingsTests(unittest.TestCase):
                    settings_entry("Widget.appex", target="WidgetB", PRODUCT_BUNDLE_IDENTIFIER="jp.shilokuma.Other.Widget")]
         self.assertEqual(self.select(entries, self.bundle("Widget.appex"))["PRODUCT_BUNDLE_IDENTIFIER"],
                          "jp.shilokuma.App.Widget")
+
+    def test_single_candidate_with_other_bundle_identifier_stops(self):
+        # 同じ製品の名前を作るターゲットが 1 つでも、Bundle ID が違えば別のバンドルなので、その entitlements では署名しない
+        entries = [settings_entry("Widget.appex", PRODUCT_BUNDLE_IDENTIFIER="jp.shilokuma.Other.Widget")]
+        with self.assertRaises(SystemExit) as raised:
+            self.select(entries, self.bundle("Widget.appex"))
+        self.assertIn("jp.shilokuma.App.Widget", str(raised.exception))
+
+    def test_bundle_without_identifier_is_picked_by_product_name(self):
+        # Info.plist の無いバンドル（単体テストの偽の Archive など）は、Bundle ID を見ずに製品の名前で選ぶ
+        bundle = self.tmp / "Widget.appex"
+        bundle.mkdir()
+        entries = [settings_entry("Widget.appex", CODE_SIGN_ENTITLEMENTS="W.entitlements")]
+        self.assertEqual(self.select(entries, bundle)["CODE_SIGN_ENTITLEMENTS"], "W.entitlements")
 
     def test_same_name_and_bundle_identifier_is_narrowed_by_platform(self):
         # kawarin-apple の iOS と macOS のターゲットのように、同じ名前・同じ Bundle ID のバンドルを作るとき。
