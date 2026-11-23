@@ -38,6 +38,9 @@
       "path": ".github/workflows/build-working.yml"
     },
     {
+      "path": ".github/workflows/archive-develop.yml"
+    },
+    {
       "path": ".github/workflows/archive-main.yml"
     },
     {

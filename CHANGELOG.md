@@ -19,6 +19,7 @@
 - TestFlight の内部テスターの設定は、`archive.platforms` の先頭のジョブだけで行う（グループはアプリに 1 つなので、2 つのジョブが同時に作らないように）
 - App Store Connect にアプリが無いときの作り方の「プラットフォーム」に、そのジョブのプラットフォームを出す（今までは iOS 決め打ち）
 - self-test に macOS だけのアプリ `fixtures/MacApp` の Build と Archive（書き出しの手前まで）を足した
+- 初めての入れ替えで外すファイル（`manifest.json` の `replaces`）に、古い 3 本立ての `.github/workflows/archive-develop.yml` を足した（quick-key-assistant-macos が持つ）
 - 呼ぶ側の直しは要らない。macOS のアプリは、入れ替えるときに `.github/app-kit.json` の `platforms`・`archive.platforms` に `macOS` を書く（スクショとクリエイティブは `unmanaged` に入れる）
 
 ## v1.3.0（2026-11-23）
