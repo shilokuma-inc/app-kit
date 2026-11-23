@@ -8,7 +8,7 @@ AskHub で開発する Apple のアプリのリポジトリに配る、CI・リ�
 - public のリポジトリ。ここのワークフローは、5 つの organization（shilokuma-inc・shariverse・BeaconFun4・tm-family・shilokuma-vision）のリポジトリから、コミットを固定して呼ばれる
 - 再利用ワークフローの中の `github` の値は、呼んだ側のもの。checkout も呼んだ側のリポジトリになる。app-kit の道具は、入力 `app-kit-ref` の版を `$RUNNER_TEMP/app-kit` に取り出して使う
 - リポジトリごとの値は、呼んだ側の `.github/app-kit.json` だけから読む（形は `schema/app-kit.schema.json`）。読んだ値は `tools/read-config.sh` で確かめてから使う
-- 確かめは `.github/workflows/self-test.yml`（`fixtures/App` に対して流す）
+- 確かめは `.github/workflows/self-test.yml`（`fixtures/` のアプリ（`App`・`MacApp`・`ExtensionApp`）に対して流す）
 
 ## ブランチ・コミット・PR
 
