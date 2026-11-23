@@ -29,6 +29,10 @@ jobs:
       - name: Test read-config.sh
         run: bash tools/tests/test-read-config.sh
 
+      - name: Test embed_archive_entitlements.py
+        # Archive に entitlements を入れる道具（xcodebuild・codesign は偽物に差し替える）
+        run: python3 tools/tests/test_embed_archive_entitlements.py
+
       - name: Test screenshot matrix
         # 撮影の plan が作る matrix（max_parallel と言語の分け方）
         run: python3 tools/tests/test-screenshot-matrix.py
