@@ -35,7 +35,7 @@ iOS と macOS を出すアプリは `archive.platforms` に両方を書く（プ
 
 - Archive はアドホック署名で作る（署名なしだと `ENABLE_APP_SANDBOX` などのビルドの設定から作られる entitlement が入らない）。本番の署名は Export がする
 - push（`com.apple.developer.aps-environment`）のように provisioning profile の要る entitlement は、アドホック署名のビルドが止まるので、
-  entitlements のファイルを自動の署名のときだけ付ける（`CODE_SIGN_ENTITLEMENTS = $(APP_ENTITLEMENTS_$(CODE_SIGN_STYLE))` のように、`CODE_SIGN_STYLE` が `Manual` なら外す。`fixtures/MacApp/Configs/Project.xcconfig`）。
+  entitlements のファイルを自動の署名のときだけ付ける（`CODE_SIGN_ENTITLEMENTS = $(APP_ENTITLEMENTS_$(CODE_SIGN_STYLE))` のように、`CODE_SIGN_STYLE` が `Manual` なら外す。`APP_ENTITLEMENTS_Automatic`・`APP_ENTITLEMENTS_Manual` はアプリの xcconfig で決める名前で、`fixtures/MacApp/Configs/Project.xcconfig` では `FIXTURE_ENTITLEMENTS_`）。
   Archive の後に、自動の署名で読んだファイルの項目を app-kit が足す
 - App Sandbox と Info.plist の `LSApplicationCategoryType` が無いと App Store Connect が断るので、書き出しの前に確かめて止める
 - App Store Connect のアプリに macOS のプラットフォームがまだ無いときは、macOS の Upload だけを飛ばし、追加の手順を Job Summary に出す
