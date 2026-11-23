@@ -1,0 +1,429 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		2AB292A6280321E456509E82 /* FixtureExtensionWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF820D6451CDC05CC435804C /* FixtureExtensionWidget.swift */; };
+		B0603A21EC9A766267343967 /* FixtureExtensionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10C605EEC43ECD0658C59B15 /* FixtureExtensionApp.swift */; };
+		C834B5EBE4BBC68D9293CD2B /* FixtureExtensionWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5833B55885FE4569516A38D3 /* FixtureExtensionWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		2BD1EA93EDDC1C6BD8254D32 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7D8D835F72BC5D002DB75769 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0FECDE11953A60FE4AFD68A7;
+			remoteInfo = FixtureExtensionWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B1B9AF0F9CCA42CBB1C9309A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C834B5EBE4BBC68D9293CD2B /* FixtureExtensionWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		10C605EEC43ECD0658C59B15 /* FixtureExtensionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureExtensionApp.swift; sourceTree = "<group>"; };
+		28DDEC8FFC03C93C1C2160E3 /* FixtureExtensionApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FixtureExtensionApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2A3A1DD6E669AD98623B18A5 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		2AC2398D4D3FBD6B3AE71450 /* FixtureExtensionWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FixtureExtensionWidget.entitlements; sourceTree = "<group>"; };
+		388EDE67EE069A0CEE3B9AA4 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		5833B55885FE4569516A38D3 /* FixtureExtensionWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = FixtureExtensionWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		9E17127449FED01F6A2B833F /* FixtureExtensionApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FixtureExtensionApp.entitlements; sourceTree = "<group>"; };
+		AF820D6451CDC05CC435804C /* FixtureExtensionWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureExtensionWidget.swift; sourceTree = "<group>"; };
+		F60830F44520F0E06B406214 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		1CF7E587732A9D9D9E8B4199 /* Configs */ = {
+			isa = PBXGroup;
+			children = (
+				2A3A1DD6E669AD98623B18A5 /* Debug.xcconfig */,
+				388EDE67EE069A0CEE3B9AA4 /* Release.xcconfig */,
+			);
+			path = Configs;
+			sourceTree = "<group>";
+		};
+		234F76C805214E7EAAF8C7CD /* FixtureExtensionWidget */ = {
+			isa = PBXGroup;
+			children = (
+				2AC2398D4D3FBD6B3AE71450 /* FixtureExtensionWidget.entitlements */,
+				AF820D6451CDC05CC435804C /* FixtureExtensionWidget.swift */,
+				F60830F44520F0E06B406214 /* Info.plist */,
+			);
+			path = FixtureExtensionWidget;
+			sourceTree = "<group>";
+		};
+		9EEF96B515B30F059B637348 = {
+			isa = PBXGroup;
+			children = (
+				1CF7E587732A9D9D9E8B4199 /* Configs */,
+				CA106F566E724EBF128017B6 /* FixtureExtensionApp */,
+				234F76C805214E7EAAF8C7CD /* FixtureExtensionWidget */,
+				A08C296139CB536F6DDD9000 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A08C296139CB536F6DDD9000 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				28DDEC8FFC03C93C1C2160E3 /* FixtureExtensionApp.app */,
+				5833B55885FE4569516A38D3 /* FixtureExtensionWidget.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CA106F566E724EBF128017B6 /* FixtureExtensionApp */ = {
+			isa = PBXGroup;
+			children = (
+				9E17127449FED01F6A2B833F /* FixtureExtensionApp.entitlements */,
+				10C605EEC43ECD0658C59B15 /* FixtureExtensionApp.swift */,
+			);
+			path = FixtureExtensionApp;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0FECDE11953A60FE4AFD68A7 /* FixtureExtensionWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 505F88AC70283F8A2907142A /* Build configuration list for PBXNativeTarget "FixtureExtensionWidget" */;
+			buildPhases = (
+				8F330AF879B155D3842D86E0 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FixtureExtensionWidget;
+			packageProductDependencies = (
+			);
+			productName = FixtureExtensionWidget;
+			productReference = 5833B55885FE4569516A38D3 /* FixtureExtensionWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		FFE932FA9AC58D27B8DE0C40 /* FixtureExtensionApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3B90316C7603E61A703DCC09 /* Build configuration list for PBXNativeTarget "FixtureExtensionApp" */;
+			buildPhases = (
+				1859254989905646D443BB0A /* Sources */,
+				B1B9AF0F9CCA42CBB1C9309A /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				930C4CDA6B0CFEDA219CBA5E /* PBXTargetDependency */,
+			);
+			name = FixtureExtensionApp;
+			packageProductDependencies = (
+			);
+			productName = FixtureExtensionApp;
+			productReference = 28DDEC8FFC03C93C1C2160E3 /* FixtureExtensionApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7D8D835F72BC5D002DB75769 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					0FECDE11953A60FE4AFD68A7 = {
+						DevelopmentTeam = XU74X3434S;
+						ProvisioningStyle = Automatic;
+					};
+					FFE932FA9AC58D27B8DE0C40 = {
+						DevelopmentTeam = XU74X3434S;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 3A8E14F06CB045B7079CE951 /* Build configuration list for PBXProject "FixtureExtensionApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 9EEF96B515B30F059B637348;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A08C296139CB536F6DDD9000 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FFE932FA9AC58D27B8DE0C40 /* FixtureExtensionApp */,
+				0FECDE11953A60FE4AFD68A7 /* FixtureExtensionWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		1859254989905646D443BB0A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0603A21EC9A766267343967 /* FixtureExtensionApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8F330AF879B155D3842D86E0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2AB292A6280321E456509E82 /* FixtureExtensionWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		930C4CDA6B0CFEDA219CBA5E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0FECDE11953A60FE4AFD68A7 /* FixtureExtensionWidget */;
+			targetProxy = 2BD1EA93EDDC1C6BD8254D32 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		10F27B463F18EE5E039E5E98 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = FixtureExtensionApp/FixtureExtensionApp.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER)";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		37C1A1AF054EFA1C48157CBF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FixtureExtensionWidget/FixtureExtensionWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = FixtureExtensionWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).Widget";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		4476E70123F3A0409E163979 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FixtureExtensionWidget/FixtureExtensionWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = FixtureExtensionWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).Widget";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A6D45F4C3AC9E11855FC57FE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2A3A1DD6E669AD98623B18A5 /* Debug.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D506B0F5A0C856FD48BBA39F /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 388EDE67EE069A0CEE3B9AA4 /* Release.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		FC067C2EFB5FFA1114535E9D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = FixtureExtensionApp/FixtureExtensionApp.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER)";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3A8E14F06CB045B7079CE951 /* Build configuration list for PBXProject "FixtureExtensionApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6D45F4C3AC9E11855FC57FE /* Debug */,
+				D506B0F5A0C856FD48BBA39F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3B90316C7603E61A703DCC09 /* Build configuration list for PBXNativeTarget "FixtureExtensionApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				10F27B463F18EE5E039E5E98 /* Debug */,
+				FC067C2EFB5FFA1114535E9D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		505F88AC70283F8A2907142A /* Build configuration list for PBXNativeTarget "FixtureExtensionWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4476E70123F3A0409E163979 /* Debug */,
+				37C1A1AF054EFA1C48157CBF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 7D8D835F72BC5D002DB75769 /* Project object */;
+}
