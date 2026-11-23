@@ -32,7 +32,11 @@ def platform_added?(app_id:, platform:, token:)
                                                                   query: { 'filter[platform]' => platform,
                                                                            'fields[appStoreVersions]' => 'platform',
                                                                            'limit' => '1' })
-  json.fetch('data').any? { |version| version.dig('attributes', 'platform') == platform }
+  # 想定外の形の応答は、NoMethodError などで原因が分からないまま止まらないよう、注釈を出して止める
+  data = json.is_a?(Hash) ? json['data'] : nil
+  abort '::error::App Store Connect の appStoreVersions の応答が想定外の形です' unless data.is_a?(Array)
+
+  data.any? { |version| version.is_a?(Hash) && version.dig('attributes', 'platform') == platform }
 end
 
 def write_output(available)
