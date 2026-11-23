@@ -9,10 +9,11 @@
 # Bundle ID の登録は Export 時に xcodebuild（-allowProvisioningUpdates）が自動で行う。
 #
 # 使い方（環境変数で渡す）:
-#   BUNDLE_ID=jp.shilokuma.MyApp APP_NAME=MyApp \
+#   BUNDLE_ID=jp.shilokuma.MyApp APP_NAME=MyApp PLATFORM=iOS \
 #   API_KEY_PATH=AuthKey_XXXXXXXXXX.p8 APPLE_API_KEY_ID=XXXXXXXXXX APPLE_API_ISSUER_ID=xxxxxxxx-... \
 #   ruby tools/app-store-connect/check-app-store-app.rb
 #
+# PLATFORM（iOS・macOS・visionOS）は、作り方の「プラットフォーム」に出す。省くと iOS。
 # GITHUB_STEP_SUMMARY が設定されていれば（GitHub Actions 上）、結果を Job Summary にも書き出す。
 #
 # Ruby の標準ライブラリだけで動く（gem のインストールは不要）。API の共通処理は app_store_connect.rb にある。
@@ -21,6 +22,7 @@ require_relative 'app_store_connect'
 
 bundle_id = AppStoreConnect.env!('BUNDLE_ID')
 app_name = AppStoreConnect.env!('APP_NAME')
+platform = ENV.fetch('PLATFORM', '').then { |value| value.empty? ? 'iOS' : value }
 token = AppStoreConnect.token_from_env
 
 begin
@@ -44,7 +46,7 @@ guide = <<~MARKDOWN
 
   | 項目 | 入力する値 |
   | --- | --- |
-  | プラットフォーム | iOS |
+  | プラットフォーム | #{platform} |
   | 名前 | #{app_name}（App Store 全体で使用済みの名前は使えません。その場合は別の名前にします） |
   | プライマリ言語 | 日本語 |
   | バンドル ID | #{bundle_id} |
