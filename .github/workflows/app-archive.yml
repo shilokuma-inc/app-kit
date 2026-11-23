@@ -130,6 +130,7 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          WORKING_DIRECTORY: ${{ inputs.working-directory }}
         run: |
           "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
           cat "$RUNNER_TEMP/app-kit.env" >> "$GITHUB_ENV"
@@ -140,12 +141,20 @@ jobs:
             macOS) sdk=macosx ;;
             *) echo "::error::Archive できないプラットフォームです: $PLATFORM"; exit 1 ;;
           esac
+          # entitlements の記録の artifact の名前。1 回の実行で fixture ごとに呼ぶ self-test のために、
+          # working-directory が . 以外なら、その道を - でつないで後ろに付ける（artifact の名前に / は使えない）
+          artifact="entitlements-$PLATFORM"
+          if [[ "$WORKING_DIRECTORY" != "." ]]; then
+            artifact="$artifact-$(printf '%s' "${WORKING_DIRECTORY#./}" | sed -e 's#/*$##' -e 's#[^A-Za-z0-9._-]#-#g')"
+          fi
+          echo "entitlements-artifact=$artifact" >> "$GITHUB_OUTPUT"
           # ExportOptions.plist と API の秘密鍵は、リポジトリの下ではなく RUNNER_TEMP に置く
           {
             echo "SDK=$sdk"
             echo "ARCHIVE_PATH=$RUNNER_TEMP/build.xcarchive"
             echo "EXPORT_OPTIONS_PATH=$RUNNER_TEMP/ExportOptions.plist"
             echo "API_KEY_PATH=$RUNNER_TEMP/private_keys/AuthKey_$APPLE_API_KEY_ID.p8"
+            echo "ENTITLEMENTS_DIR=$RUNNER_TEMP/entitlements"
           } >> "$GITHUB_ENV"
 
       - name: Check secrets
@@ -234,23 +243,26 @@ jobs:
         # 静的な xcframework（Firebase・Google Mobile Ads など）は、同梱するときに Xcode がバイナリを外して空のスタブを差し込む。
         # スタブはリンカーの仮の署名のままで識別子が arm64-apple になっていて、署名なしの Archive では Xcode の署名で直らない。
         # Export はこの識別子のまま再署名するので、App Store Connect が Invalid Signature で弾く。
-        # Info.plist の CFBundleIdentifier と識別子が違うフレームワークを、その識別子でアドホック署名し直す（本番の署名は Export がする）。
+        # Info.plist の CFBundleIdentifier と識別子が違うフレームワーク（本体と App Extension の Frameworks/）を、その識別子でアドホック署名し直す（本番の署名は Export がする）。
         # macOS はアドホック署名で Archive するので、同梱するときに Xcode が署名する（ここで署名し直すと、アプリの署名が合わなくなる）
         if: matrix.platform != 'macOS'
         run: '"$APP_KIT_DIR/tools/fix-stub-framework-signatures.sh" "$ARCHIVE_PATH"'
 
       - name: Embed entitlements into the archive
-        # Export は Archive の中のアプリの署名にある entitlement だけを引き継ぐ。署名なしの Archive（iOS・visionOS）には entitlements の
-        # ファイル（CODE_SIGN_ENTITLEMENTS）が入らないので、そのままだと配信ビルドに基本の entitlement しか付かず、WeatherKit などが実機で動かない。
-        # $(…) を展開した entitlements のファイルでアプリをアドホック署名しておく（本番の署名は Export がする）。
-        # macOS はアドホック署名の entitlement（sandbox など）に、プロジェクトの既定の署名で読んだファイルの項目を足す（push のように、
-        # アドホック署名のビルドでは付けられない entitlement のため）。対象はアプリ本体だけ（App Extension は入れない）
+        # Export は Archive の中の各バンドルの署名にある entitlement だけを引き継ぐ。署名なしの Archive（iOS・visionOS）には entitlements の
+        # ファイル（CODE_SIGN_ENTITLEMENTS）が入らないので、そのままだと配信ビルドに基本の entitlement しか付かず、WeatherKit や
+        # ウィジェットの App Groups などが実機で動かない。本体と中のバンドル（App Extension など）を、$(…) を展開した entitlements の
+        # ファイルで、内側から順にアドホック署名しておく（本番の署名は Export がする）。
+        # macOS は本体のアドホック署名の entitlement（sandbox など）に、プロジェクトの既定の署名で読んだファイルの項目を足す（push のように、
+        # アドホック署名のビルドでは付けられない entitlement のため）。macOS の中のバンドルには足さず、足りなければ止める。
+        # バンドルごとのソースの entitlements と署名の結果を、記録（JSON）と Job Summary に出す
         run: |
           python3 "$APP_KIT_DIR/tools/embed_archive_entitlements.py" embed "$ARCHIVE_PATH" \
             --project "$APP_KIT_PROJECT" \
             --scheme "$APP_KIT_SCHEME" \
             --sdk "$SDK" \
-            --configuration Release
+            --configuration Release \
+            --record "$ENTITLEMENTS_DIR/archive.json"
 
       - name: Check Mac App Store requirements
         # App Sandbox と Info.plist の LSApplicationCategoryType が無いと、ビルドも書き出しも通るのに App Store Connect への Upload で断られる。
@@ -288,10 +300,26 @@ jobs:
             -authenticationKeyIssuerID "$APPLE_API_ISSUER_ID"
 
       - name: Verify entitlements of the exported ${{ matrix.platform == 'macOS' && 'pkg' || 'IPA' }}
-        # Archive のアプリの署名にある entitlement が、書き出した IPA・pkg のアプリにも残っているかを確かめる。
+        # Archive の本体と中のバンドルごとに、Archive の署名の entitlement と、記録のソースの entitlement が、
+        # 書き出した IPA・pkg の同じ場所のバンドルにも残っているかを確かめる。
         # 配布用の profile に無い entitlement を Export が落とすと、ビルドも Upload も通るのに、実機でその機能だけ動かない
         if: inputs.export
-        run: python3 "$APP_KIT_DIR/tools/embed_archive_entitlements.py" check "$ARCHIVE_PATH" "$RUNNER_TEMP/export"
+        run: |
+          python3 "$APP_KIT_DIR/tools/embed_archive_entitlements.py" check "$ARCHIVE_PATH" "$RUNNER_TEMP/export" \
+            --record "$ENTITLEMENTS_DIR/archive.json" \
+            --report "$ENTITLEMENTS_DIR/export.json"
+
+      - name: Upload entitlements record
+        # バンドルごとの entitlements（Archive と、書き出したもの）を JSON で上げる。self-test と、入れ替えの後の点検が、IPA を落とさずに読む。
+        # 中身は配信したアプリからも読める値（Team ID・Bundle ID・App Group など）だけで、IPA・pkg は上げない。
+        # 確かめで止まったときも、何が抜けたかを読めるように上げる（Re-run でも上げ直せるように overwrite）
+        if: ${{ !cancelled() && steps.config.outputs.entitlements-artifact != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.config.outputs.entitlements-artifact }}
+          path: ${{ runner.temp }}/entitlements
+          if-no-files-found: ignore
+          overwrite: true
 
       - name: Check app exists in App Store Connect
         # App Store Connect にアプリが無いと、Upload が "Error Downloading App Information" で落ち、原因が分かりにくい。
