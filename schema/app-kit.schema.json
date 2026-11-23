@@ -78,7 +78,7 @@
       "type": "object",
       "properties": {
         "platforms": {
-          "description": "Archive・Upload するプラットフォーム。省くと platforms の先頭だけ。macOS はまだ扱わない（app-archive.yml が断る）",
+          "description": "Archive・Upload するプラットフォーム（プラットフォームごとに別のジョブ）。省くと platforms の先頭だけ。iOS・visionOS は IPA、macOS は pkg（Mac App Store）を書き出す",
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,

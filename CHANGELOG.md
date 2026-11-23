@@ -5,6 +5,23 @@
 
 ## Unreleased
 
+## v1.4.0（2026-11-23）
+
+- macOS（Mac App Store）の Archive・`.pkg` の書き出し・App Store Connect への Upload を扱うようにした。`.github/app-kit.json` の `archive.platforms` に `macOS` を書く（v1.3.0 までは plan で断っていた）。Secrets は iOS と同じものを使う
+  - Archive はアドホック署名で作る（署名なしでは App Sandbox などの entitlement が入らず、App Store Connect が断るため）。スタブのフレームワークの署名の直しは、macOS では行わない
+  - 書き出しの前に、Archive に App Sandbox（`com.apple.security.app-sandbox`）と Info.plist の `LSApplicationCategoryType` があるかを確かめる
+  - App Store Connect のアプリに macOS のプラットフォームが無いときは、macOS の Upload だけを飛ばし、追加の手順を Job Summary に出す（ジョブは成功のまま）
+- Archive に entitlements を入れる道具を、shilokuma-inc/ask-hub-apple の `Tools/embed_archive_entitlements.py` に寄せた（`tools/embed_archive_entitlements.py`。`embed-entitlements.sh`・`verify-exported-entitlements.sh` は外した）。iOS・visionOS も同じ道具を使う
+  - entitlements のファイルの `$(…)` を、ビルドの設定で展開してから入れる（`$(TeamIdentifierPrefix)` は `DEVELOPMENT_TEAM` から作る。`$(AppIdentifierPrefix)` は App ID の接頭辞が Team ID と違うことがあるので、使っていれば止める）。v1.3.0 では展開せず、書き出しの確かめで落ちていた
+  - アプリのターゲットの設定を、製品の名前（`App.app`）で選ぶ。v1.3.0 では Scheme の先頭のターゲットの設定を読んでいたので、テストや App Extension のターゲットが先にあると違うファイルを入れていた
+  - macOS は、アドホック署名の Archive の entitlement に、プロジェクトの既定の署名（自動）で読んだファイルの項目を足す。足すものが無ければ署名し直さない
+  - 書き出した IPA・pkg の確かめは、Archive のアプリの署名の entitlement がすべて残ったかを見る
+- TestFlight の内部テスターの設定は、`archive.platforms` の先頭のジョブだけで行う（グループはアプリに 1 つなので、2 つのジョブが同時に作らないように）
+- App Store Connect にアプリが無いときの作り方の「プラットフォーム」に、そのジョブのプラットフォームを出す（今までは iOS 決め打ち）
+- self-test に macOS だけのアプリ `fixtures/MacApp` の Build と Archive（書き出しの手前まで）を足した
+- 初めての入れ替えで外すファイル（`manifest.json` の `replaces`）に、古い 3 本立ての `.github/workflows/archive-develop.yml` を足した（quick-key-assistant-macos が持つ）
+- 呼ぶ側の直しは要らない。macOS のアプリは、入れ替えるときに `.github/app-kit.json` の `platforms`・`archive.platforms` に `macOS` を書く（スクショとクリエイティブは `unmanaged` に入れる）
+
 ## v1.3.0（2026-11-23）
 
 - 撮影で Apple Vision Pro（表示サイズ `APP_APPLE_VISION_PRO`、3840x2160）を撮れるようにした。プラットフォームは表示サイズの名前で決め、visionOS は `xrsimulator` の SDK と visionOS のランタイムで撮る（ランタイムが無ければ `xcodebuild -downloadPlatform visionOS` で入れる）。visionOS にはステータスバーと Dynamic Island が無いので、上書きも重ねもしない。iPhone・iPad の撮り方は変わらない

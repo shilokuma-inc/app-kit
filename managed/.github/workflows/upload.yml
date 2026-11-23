@@ -2,7 +2,7 @@
 # リポジトリごとの値は .github/app-kit.json に書く。版（@ の後ろのコミットと app-kit-ref）は AskHub の司令塔が書く
 name: Upload
 
-# develop・release/** への push で Archive → IPA の書き出し → App Store Connect への Upload を行う。
+# develop・release/** への push で Archive → IPA・pkg の書き出し → App Store Connect への Upload を行う（.github/app-kit.json の archive.platforms ごと）。
 # 作業ブランチを TestFlight で確かめたいときは、手動の実行（workflow_dispatch）でそのブランチを選ぶ。
 # 作業ブランチの push ごとに上げると、App Store Connect の 24 時間あたりのアップロードの上限に当たるため、自動では上げない。
 # main には release ブランチの先頭がそのまま入るので、main では上げない

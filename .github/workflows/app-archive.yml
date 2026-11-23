@@ -1,10 +1,11 @@
 # 各リポジトリの Upload・Archive から呼ぶ再利用ワークフロー（Archive → 書き出し → App Store Connect への Upload）。
 # リポジトリごとの値は、呼んだ側の .github/app-kit.json から読む（archive.platforms のプラットフォームごとに 1 つのジョブ）。
+# 書き出すのは、iOS・visionOS は IPA、macOS は pkg（Mac App Store）。どれも同じ ExportOptions.plist（Secret EXPORT_OPTIONS）で書き出す。
 #
 # 認証はすべて App Store Connect の API キーで行う（Apple ID・App 用パスワードは使わない）。
 # Upload は ExportOptions.plist の destination を upload にした xcodebuild -exportArchive で行う。
 # Secrets は、組織をまたぐと secrets: inherit が効かないので、呼ぶ側で名前を並べて渡す。
-# 書き出した IPA は artifact に上げない（public のリポジトリでは誰でも取れるため）。
+# 書き出した IPA・pkg は artifact に上げない（public のリポジトリでは誰でも取れるため）。
 name: app-archive
 
 on:
@@ -15,11 +16,11 @@ on:
         type: string
         required: true
       export:
-        description: Archive の後に IPA の書き出しまで行うか（App Store Connect の API キーが要る）。false なら Archive だけを確かめる
+        description: Archive の後に IPA・pkg の書き出しまで行うか（App Store Connect の API キーが要る）。false なら Archive だけを確かめる
         type: boolean
         default: true
       upload:
-        description: 書き出した IPA を App Store Connect に上げるか（export が true のときだけ）
+        description: 書き出した IPA・pkg を App Store Connect に上げるか（export が true のときだけ）
         type: boolean
         default: false
       working-directory:
@@ -63,6 +64,7 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
     outputs:
       platforms: ${{ steps.config.outputs.platforms }}
+      first-platform: ${{ steps.config.outputs.first-platform }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -89,11 +91,10 @@ jobs:
           "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
           cat "$RUNNER_TEMP/app-kit.env"
           platforms=$(sed -n 's/^APP_KIT_ARCHIVE_PLATFORMS_JSON=//p' "$RUNNER_TEMP/app-kit.env")
-          if jq -e 'index("macOS")' <<<"$platforms" >/dev/null; then
-            echo "::error::macOS の Archive・Upload は、この版の app-kit ではまだ扱いません（.github/app-kit.json の archive.platforms から外すか、リポジトリのワークフローで行ってください）"
-            exit 1
-          fi
-          echo "platforms=$platforms" >> "$GITHUB_OUTPUT"
+          {
+            echo "platforms=$platforms"
+            echo "first-platform=$(jq -r '.[0]' <<<"$platforms")"
+          } >> "$GITHUB_OUTPUT"
 
   archive:
     name: archive (${{ matrix.platform }})
@@ -136,6 +137,7 @@ jobs:
           case "$PLATFORM" in
             iOS) sdk=iphoneos ;;
             visionOS) sdk=xros ;;
+            macOS) sdk=macosx ;;
             *) echo "::error::Archive できないプラットフォームです: $PLATFORM"; exit 1 ;;
           esac
           # ExportOptions.plist と API の秘密鍵は、リポジトリの下ではなく RUNNER_TEMP に置く
@@ -203,27 +205,58 @@ jobs:
           plutil -lint "$APP_KIT_GOOGLE_SERVICE_INFO"
 
       - name: Archive
+        # 本番の署名は Export がする。iOS・visionOS は署名せずに Archive する（アドホック署名は、push などの entitlement が
+        # provisioning profile を要するため「requires a provisioning profile」で止まる）。
+        # macOS はアドホック署名で Archive する。署名しないと ENABLE_APP_SANDBOX などのビルドの設定から作られる entitlement が入らず、
+        # Export でも足されないので、App Store Connect が App Sandbox の無いアプリとして断る
         run: |
-          xcodebuild archive \
-            -project "$APP_KIT_PROJECT" \
-            -scheme "$APP_KIT_SCHEME" \
-            -sdk "$SDK" \
-            -configuration Release \
-            -archivePath "$ARCHIVE_PATH" \
-            CODE_SIGNING_ALLOWED=NO
+          if [[ "$SDK" == "macosx" ]]; then
+            xcodebuild archive \
+              -project "$APP_KIT_PROJECT" \
+              -scheme "$APP_KIT_SCHEME" \
+              -destination 'generic/platform=macOS' \
+              -configuration Release \
+              -archivePath "$ARCHIVE_PATH" \
+              CODE_SIGN_IDENTITY=- \
+              CODE_SIGN_STYLE=Manual \
+              PROVISIONING_PROFILE_SPECIFIER=
+          else
+            xcodebuild archive \
+              -project "$APP_KIT_PROJECT" \
+              -scheme "$APP_KIT_SCHEME" \
+              -sdk "$SDK" \
+              -configuration Release \
+              -archivePath "$ARCHIVE_PATH" \
+              CODE_SIGNING_ALLOWED=NO
+          fi
 
       - name: Fix signatures of stub frameworks
         # 静的な xcframework（Firebase・Google Mobile Ads など）は、同梱するときに Xcode がバイナリを外して空のスタブを差し込む。
         # スタブはリンカーの仮の署名のままで識別子が arm64-apple になっていて、署名なしの Archive では Xcode の署名で直らない。
         # Export はこの識別子のまま再署名するので、App Store Connect が Invalid Signature で弾く。
-        # Info.plist の CFBundleIdentifier と識別子が違うフレームワークを、その識別子でアドホック署名し直す（本番の署名は Export がする）
+        # Info.plist の CFBundleIdentifier と識別子が違うフレームワークを、その識別子でアドホック署名し直す（本番の署名は Export がする）。
+        # macOS はアドホック署名で Archive するので、同梱するときに Xcode が署名する（ここで署名し直すと、アプリの署名が合わなくなる）
+        if: matrix.platform != 'macOS'
         run: '"$APP_KIT_DIR/tools/fix-stub-framework-signatures.sh" "$ARCHIVE_PATH"'
 
-      - name: Embed entitlements into the unsigned archive
-        # 署名なしの Archive では、entitlements のファイル（CODE_SIGN_ENTITLEMENTS）がアプリに入らない。
-        # Export は Archive の中のアプリを再署名するだけなので、そのままだと配信ビルドに基本の entitlement しか付かず、WeatherKit などが実機で動かない。
-        # entitlements のファイルでアプリをアドホック署名しておく（本番の署名は Export がする）。対象はアプリ本体だけ（App Extension は入れない）
-        run: '"$APP_KIT_DIR/tools/embed-entitlements.sh" "$ARCHIVE_PATH"'
+      - name: Embed entitlements into the archive
+        # Export は Archive の中のアプリの署名にある entitlement だけを引き継ぐ。署名なしの Archive（iOS・visionOS）には entitlements の
+        # ファイル（CODE_SIGN_ENTITLEMENTS）が入らないので、そのままだと配信ビルドに基本の entitlement しか付かず、WeatherKit などが実機で動かない。
+        # $(…) を展開した entitlements のファイルでアプリをアドホック署名しておく（本番の署名は Export がする）。
+        # macOS はアドホック署名の entitlement（sandbox など）に、プロジェクトの既定の署名で読んだファイルの項目を足す（push のように、
+        # アドホック署名のビルドでは付けられない entitlement のため）。対象はアプリ本体だけ（App Extension は入れない）
+        run: |
+          python3 "$APP_KIT_DIR/tools/embed_archive_entitlements.py" embed "$ARCHIVE_PATH" \
+            --project "$APP_KIT_PROJECT" \
+            --scheme "$APP_KIT_SCHEME" \
+            --sdk "$SDK" \
+            --configuration Release
+
+      - name: Check Mac App Store requirements
+        # App Sandbox と Info.plist の LSApplicationCategoryType が無いと、ビルドも書き出しも通るのに App Store Connect への Upload で断られる。
+        # 鍵が要らないので、書き出しの前（export が false のときも）に確かめる
+        if: matrix.platform == 'macOS'
+        run: python3 "$APP_KIT_DIR/tools/embed_archive_entitlements.py" mac-requirements "$ARCHIVE_PATH"
 
       - name: Create ExportOptions.plist and API private key
         # Secrets はシェル展開ではなく env で渡す
@@ -237,7 +270,8 @@ jobs:
           mkdir -p "$(dirname "$API_KEY_PATH")"
           printf '%s' "$APPLE_API_KEY_BASE64" | base64 --decode > "$API_KEY_PATH"
 
-      - name: Export IPA
+      - name: Export ${{ matrix.platform == 'macOS' && 'pkg' || 'IPA' }}
+        # 同じ ExportOptions.plist から、iOS・visionOS は IPA、macOS は pkg（Mac Installer Distribution で署名）が出る
         if: inputs.export
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -253,11 +287,11 @@ jobs:
             -authenticationKeyID "$APPLE_API_KEY_ID" \
             -authenticationKeyIssuerID "$APPLE_API_ISSUER_ID"
 
-      - name: Verify entitlements of the exported IPA
-        # entitlements のファイルに書いた項目が、書き出した IPA のアプリにも入っているかを確かめる。
-        # 欠けたまま配信すると、ビルドも Upload も通るのに、実機でその機能だけ動かない
+      - name: Verify entitlements of the exported ${{ matrix.platform == 'macOS' && 'pkg' || 'IPA' }}
+        # Archive のアプリの署名にある entitlement が、書き出した IPA・pkg のアプリにも残っているかを確かめる。
+        # 配布用の profile に無い entitlement を Export が落とすと、ビルドも Upload も通るのに、実機でその機能だけ動かない
         if: inputs.export
-        run: '"$APP_KIT_DIR/tools/verify-exported-entitlements.sh" "$RUNNER_TEMP/export"'
+        run: python3 "$APP_KIT_DIR/tools/embed_archive_entitlements.py" check "$ARCHIVE_PATH" "$RUNNER_TEMP/export"
 
       - name: Check app exists in App Store Connect
         # App Store Connect にアプリが無いと、Upload が "Error Downloading App Information" で落ち、原因が分かりにくい。
@@ -266,15 +300,30 @@ jobs:
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$ARCHIVE_PATH/Info.plist") \
           APP_NAME="$APP_KIT_SCHEME" \
             ruby "$APP_KIT_DIR/tools/app-store-connect/check-app-store-app.rb"
 
+      - name: Check macOS platform in App Store Connect
+        # iOS と macOS を出すアプリで、App Store Connect のアプリに macOS のプラットフォームをまだ足していないと、Upload が毎回落ちる。
+        # 足すのは Web でしかできないので、読むだけで確かめ、無ければ手順を Job Summary に出して Upload を飛ばす（失敗にはしない）
+        id: platform
+        if: inputs.export && inputs.upload && matrix.platform == 'macOS'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$ARCHIVE_PATH/Info.plist") \
+          PLATFORM=MAC_OS \
+            ruby "$APP_KIT_DIR/tools/app-store-connect/check-app-store-platform.rb"
+
       - name: Set up TestFlight internal testers
         # 内部テストグループ（すべてのビルドを自動で配る）を用意し、Secret TESTFLIGHT_INTERNAL_TESTERS のメールアドレスを内部テスターに入れる。
-        # 失敗しても Upload は止めない（Job Summary と注釈で知らせる）。メールアドレスは Secret で渡す（変数の値はログにそのまま出るため）
-        if: inputs.export && inputs.upload
+        # 失敗しても Upload は止めない（Job Summary と注釈で知らせる）。メールアドレスは Secret で渡す（変数の値はログにそのまま出るため）。
+        # グループはアプリに 1 つ（プラットフォームによらない）なので、archive.platforms の先頭のジョブだけで行う（同時にグループを作らないように）
+        if: inputs.export && inputs.upload && matrix.platform == needs.plan.outputs.first-platform && steps.platform.outputs.available != 'false'
         continue-on-error: true
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
@@ -286,8 +335,9 @@ jobs:
 
       - name: Upload to App Store Connect
         # ビルド番号は Xcode に振らせる（manageAppVersionAndBuildNumber）。App Store Connect の最新のビルド番号を見て増やすので、
-        # xcconfig の CURRENT_PROJECT_VERSION を手で上げなくてよい。organization で共有する EXPORT_OPTIONS は書き換えず、ランナーの写しだけを変える
-        if: inputs.export && inputs.upload
+        # xcconfig の CURRENT_PROJECT_VERSION を手で上げなくてよい（iOS と macOS のビルド番号は別に数える）。
+        # organization で共有する EXPORT_OPTIONS は書き換えず、ランナーの写しだけを変える
+        if: inputs.export && inputs.upload && steps.platform.outputs.available != 'false'
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}

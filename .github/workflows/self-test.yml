@@ -29,6 +29,10 @@ jobs:
       - name: Test read-config.sh
         run: bash tools/tests/test-read-config.sh
 
+      - name: Test embed_archive_entitlements.py
+        # Archive に entitlements を入れる道具（xcodebuild・codesign は偽物に差し替える）
+        run: python3 tools/tests/test_embed_archive_entitlements.py
+
       - name: Test screenshot matrix
         # 撮影の plan が作る matrix（max_parallel と言語の分け方）
         run: python3 tools/tests/test-screenshot-matrix.py
@@ -93,6 +97,22 @@ jobs:
       app-kit-ref: ${{ github.sha }}
       export: false
       working-directory: fixtures/App
+
+  build-macos:
+    # macOS だけのアプリ（fixtures/MacApp）。テストはアドホック署名・App Sandbox なしで流す
+    uses: ./.github/workflows/app-build.yml
+    with:
+      app-kit-ref: ${{ github.sha }}
+      working-directory: fixtures/MacApp
+
+  archive-macos:
+    # macOS はアドホック署名で Archive し、自動の署名のときだけ付ける entitlement（push）を足して、
+    # Mac App Store に要る App Sandbox とカテゴリを確かめる（鍵の要らないところまで）
+    uses: ./.github/workflows/app-archive.yml
+    with:
+      app-kit-ref: ${{ github.sha }}
+      export: false
+      working-directory: fixtures/MacApp
 
   creative-render:
     # クリエイティブアセットの書き出しの道具を、仮の画面と見本の案で確かめる（はみ出し・無い画面・再現性）
