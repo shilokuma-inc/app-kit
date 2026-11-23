@@ -42,8 +42,8 @@ VARIABLE = re.compile(r"\$[({]([A-Za-z_][A-Za-z0-9_]*)[)}]")
 #: Mac App Store のアプリに要る entitlement
 APP_SANDBOX = "com.apple.security.app-sandbox"
 
-#: Xcode が署名のときに Team ID から決める変数（App Groups・キーチェーンの共有などに使う）。`-showBuildSettings` には出ない
-SIGNING_PREFIXES = ("TeamIdentifierPrefix", "AppIdentifierPrefix")
+#: Xcode が署名のときに決める変数のうち、Archive の前には決められないもの（App ID の接頭辞。古い App ID では Team ID と違う）
+UNKNOWN_BEFORE_SIGNING = "AppIdentifierPrefix"
 
 
 def fail(message: str) -> SystemExit:
@@ -59,7 +59,11 @@ def expand(value, settings: dict[str, str]):
     if isinstance(value, str):
         missing = sorted({name for name in VARIABLE.findall(value) if name not in settings})
         if missing:
-            raise fail(f"entitlements の {', '.join(missing)} がビルドの設定にありません: {value}")
+            hint = ""
+            if UNKNOWN_BEFORE_SIGNING in missing:
+                hint = ("（$(AppIdentifierPrefix) は署名のときに App ID の profile から決まり、Archive の前には分かりません。"
+                        "App ID の接頭辞が Team ID と同じなら $(TeamIdentifierPrefix) と書いてください）")
+            raise fail(f"entitlements の {', '.join(missing)} がビルドの設定にありません: {value}{hint}")
         return VARIABLE.sub(lambda match: settings[match.group(1)], value)
     if isinstance(value, list):
         return [expand(item, settings) for item in value]
@@ -69,16 +73,16 @@ def expand(value, settings: dict[str, str]):
 
 
 def with_signing_prefixes(settings: dict[str, str]) -> dict[str, str]:
-    """`$(TeamIdentifierPrefix)`・`$(AppIdentifierPrefix)` を、ビルドの設定の DEVELOPMENT_TEAM（`<Team ID>.`）で補う。
+    """`$(TeamIdentifierPrefix)` を、ビルドの設定の DEVELOPMENT_TEAM（`<Team ID>.`）で補う。
 
-    Xcode は署名するときに profile の Team ID でこの 2 つを決めるので、`-showBuildSettings` の結果には無い。
-    今の App ID の接頭辞は Team ID と同じ（macOS のアドホック署名の Archive でも、Xcode は Team ID で展開する）。
-    DEVELOPMENT_TEAM が無ければ補わない（使っていれば expand が止める）。
+    Xcode は署名するときにこの値を決めるので、`-showBuildSettings` の結果には無い（App Groups などに使う）。
+    `$(AppIdentifierPrefix)` は App ID の接頭辞で、古い App ID では Team ID と違うので補わない（使っていれば expand が止める）。
+    DEVELOPMENT_TEAM が無ければ補わない。
     """
     team = settings.get("DEVELOPMENT_TEAM", "")
     if not team:
         return settings
-    return {**{name: f"{team}." for name in SIGNING_PREFIXES}, **settings}
+    return {"TeamIdentifierPrefix": f"{team}.", **settings}
 
 
 def app_build_settings(entries: list[dict], product_name: str) -> dict[str, str]:

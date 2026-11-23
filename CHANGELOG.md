@@ -12,7 +12,7 @@
   - 書き出しの前に、Archive に App Sandbox（`com.apple.security.app-sandbox`）と Info.plist の `LSApplicationCategoryType` があるかを確かめる
   - App Store Connect のアプリに macOS のプラットフォームが無いときは、macOS の Upload だけを飛ばし、追加の手順を Job Summary に出す（ジョブは成功のまま）
 - Archive に entitlements を入れる道具を、shilokuma-inc/ask-hub-apple の `Tools/embed_archive_entitlements.py` に寄せた（`tools/embed_archive_entitlements.py`。`embed-entitlements.sh`・`verify-exported-entitlements.sh` は外した）。iOS・visionOS も同じ道具を使う
-  - entitlements のファイルの `$(…)` を、ビルドの設定で展開してから入れる（`$(TeamIdentifierPrefix)`・`$(AppIdentifierPrefix)` は `DEVELOPMENT_TEAM` から作る）。v1.3.0 では展開せず、書き出しの確かめで落ちていた
+  - entitlements のファイルの `$(…)` を、ビルドの設定で展開してから入れる（`$(TeamIdentifierPrefix)` は `DEVELOPMENT_TEAM` から作る。`$(AppIdentifierPrefix)` は App ID の接頭辞が Team ID と違うことがあるので、使っていれば止める）。v1.3.0 では展開せず、書き出しの確かめで落ちていた
   - アプリのターゲットの設定を、製品の名前（`App.app`）で選ぶ。v1.3.0 では Scheme の先頭のターゲットの設定を読んでいたので、テストや App Extension のターゲットが先にあると違うファイルを入れていた
   - macOS は、アドホック署名の Archive の entitlement に、プロジェクトの既定の署名（自動）で読んだファイルの項目を足す。足すものが無ければ署名し直さない
   - 書き出した IPA・pkg の確かめは、Archive のアプリの署名の entitlement がすべて残ったかを見る

@@ -76,18 +76,23 @@ class ExpandTests(unittest.TestCase):
 
 
 class SigningPrefixesTests(unittest.TestCase):
-    def test_fills_prefixes_from_team(self):
+    def test_fills_team_prefix_from_team(self):
         # Xcode が署名のときに決める変数は -showBuildSettings に出ないので、DEVELOPMENT_TEAM で補う
         settings = embed_archive_entitlements.with_signing_prefixes({"DEVELOPMENT_TEAM": "ABCDE12345"})
-        self.assertEqual(
-            embed_archive_entitlements.expand(["$(TeamIdentifierPrefix)group", "$(AppIdentifierPrefix)keychain"], settings),
-            ["ABCDE12345.group", "ABCDE12345.keychain"],
-        )
+        self.assertEqual(embed_archive_entitlements.expand(["$(TeamIdentifierPrefix)group"], settings),
+                         ["ABCDE12345.group"])
 
     def test_keeps_values_from_build_settings(self):
         settings = embed_archive_entitlements.with_signing_prefixes(
-            {"DEVELOPMENT_TEAM": "ABCDE12345", "AppIdentifierPrefix": "LEGACY123."})
-        self.assertEqual(settings["AppIdentifierPrefix"], "LEGACY123.")
+            {"DEVELOPMENT_TEAM": "ABCDE12345", "TeamIdentifierPrefix": "OTHER12345."})
+        self.assertEqual(settings["TeamIdentifierPrefix"], "OTHER12345.")
+
+    def test_app_prefix_is_not_guessed(self):
+        # App ID の接頭辞は、古い App ID では Team ID と違うので、推し量らずに止める
+        settings = embed_archive_entitlements.with_signing_prefixes({"DEVELOPMENT_TEAM": "ABCDE12345"})
+        with self.assertRaises(SystemExit) as raised:
+            embed_archive_entitlements.expand("$(AppIdentifierPrefix)keychain", settings)
+        self.assertIn("$(TeamIdentifierPrefix) と書いてください", str(raised.exception))
 
     def test_without_team_prefixes_stay_missing(self):
         with self.assertRaises(SystemExit) as raised:
