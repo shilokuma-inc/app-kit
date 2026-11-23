@@ -1,0 +1,11 @@
+//
+//  Debug.xcconfig
+//  FixtureMacApp
+//
+//  Debug 構成だけに適用したい設定をここに書く。
+//
+
+#include "Project.xcconfig"
+
+// entitlements の aps-environment（push の送り先）
+APS_ENVIRONMENT = development

@@ -1,0 +1,69 @@
+# fixtures/MacApp の XcodeGen の定義。FixtureMacApp.xcodeproj はこれから作ってコミットしている
+# （self-test でランナーに XcodeGen を入れないため。.github/app-kit.json の generate は null）。
+# 直したら fixtures/MacApp で `xcodegen generate` を流し、作り直した FixtureMacApp.xcodeproj も一緒にコミットする。
+#
+# macOS の Archive で確かめたいことを入れている:
+# - App Sandbox はビルドの設定（ENABLE_APP_SANDBOX）だけで有効にする。署名なしの Archive では入らない entitlement
+# - entitlements のファイルは、アドホック署名（CODE_SIGN_STYLE=Manual）のときと自動の署名のときで分ける（Configs/Project.xcconfig）。
+#   自動の署名のときだけ付ける push の entitlement は、Archive の後に app-kit が足す
+# - Mac App Store に要る LSApplicationCategoryType
+name: FixtureMacApp
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "14.0"
+configFiles:
+  Debug: Configs/Debug.xcconfig
+  Release: Configs/Release.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+targets:
+  FixtureMacApp:
+    type: application
+    platform: macOS
+    sources:
+      - FixtureMacApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER)
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: $(FIXTURE_ENTITLEMENTS_$(CODE_SIGN_STYLE))
+        ENABLE_APP_SANDBOX: true
+        ENABLE_HARDENED_RUNTIME: true
+        ENABLE_USER_SELECTED_FILES: readonly
+  FixtureMacAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - FixtureMacAppTests
+    dependencies:
+      - target: FixtureMacApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER).Tests
+        GENERATE_INFOPLIST_FILE: true
+  FixtureMacAppUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - FixtureMacAppUITests
+    dependencies:
+      - target: FixtureMacApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER).UITests
+        GENERATE_INFOPLIST_FILE: true
+schemes:
+  FixtureMacApp:
+    build:
+      targets:
+        FixtureMacApp: all
+    test:
+      targets:
+        - FixtureMacAppTests
+        - FixtureMacAppUITests
+    archive:
+      config: Release

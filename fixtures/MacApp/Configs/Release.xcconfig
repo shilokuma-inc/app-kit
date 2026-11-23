@@ -1,0 +1,11 @@
+//
+//  Release.xcconfig
+//  FixtureMacApp
+//
+//  Release 構成だけに適用したい設定をここに書く。
+//
+
+#include "Project.xcconfig"
+
+// entitlements の aps-environment（push の送り先）。配布の書き出しでは Export が profile に合わせて書き換える
+APS_ENVIRONMENT = production

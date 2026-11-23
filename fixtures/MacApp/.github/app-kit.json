@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "project": "FixtureMacApp.xcodeproj",
+  "scheme": "FixtureMacApp",
+  "platforms": ["macOS"],
+  "uiTests": "FixtureMacAppUITests",
+  "swiftlint": false,
+  "archive": { "platforms": ["macOS"] }
+}
