@@ -18,6 +18,7 @@
     python3 tools/screenshots/app_store_config.py devices APP_IPHONE_67
     python3 tools/screenshots/app_store_config.py sizes APP_IPHONE_67
     python3 tools/screenshots/app_store_config.py derive-from APP_IPHONE_61   # 縮めて作る元の表示サイズ（無ければ空）
+    python3 tools/screenshots/app_store_config.py platform APP_APPLE_VISION_PRO  # 撮る Simulator のプラットフォーム（iOS / visionOS）
     python3 tools/screenshots/app_store_config.py xcode-version APP_IPHONE_67  # 撮影に使う Xcode の版
     python3 tools/screenshots/app_store_config.py developer-dir APP_IPHONE_67  # その版の Xcode の DEVELOPER_DIR（--selected-only で今の Xcode だけを見る）
     python3 tools/screenshots/app_store_config.py display-types [APP_IPHONE_67,...]  # GitHub Actions の matrix 用 JSON
@@ -55,6 +56,13 @@ DEFAULT_XCODE_VERSION = "26.6"
 
 #: 手元で撮るとき、xcodeVersion の Xcode を探す場所
 XCODE_SEARCH_DIRS = (Path("/Applications"), Path.home() / "Applications")
+
+#: 撮れる表示サイズ（App Store Connect の名前の先頭）と、撮る Simulator のプラットフォーム。Mac・Apple TV・Apple Watch はまだ撮れない
+PLATFORMS = (
+    ("APP_IPHONE_", "iOS"),
+    ("APP_IPAD_", "iOS"),
+    ("APP_APPLE_VISION_PRO", "visionOS"),
+)
 
 
 class Language(NamedTuple):
@@ -209,6 +217,21 @@ def display_type(name: str) -> dict:
     return entry
 
 
+def platform(name: str) -> str:
+    """表示サイズを撮る Simulator のプラットフォーム（iOS / visionOS）。表示サイズの名前で決める。
+
+    撮れない表示サイズ（Mac など）は、撮影（macOS のランナーで数十分）の前に plan で止める。
+    """
+    display_type(name)
+    for prefix, value in PLATFORMS:
+        if name.startswith(prefix):
+            return value
+    raise SystemExit(
+        f"{SCREENSHOTS_FILE.name} の {name} は撮れない表示サイズです。"
+        "撮れるのは APP_IPHONE_*・APP_IPAD_*（iOS）と APP_APPLE_VISION_PRO（visionOS）"
+    )
+
+
 def display_type_names(selected: list[str] | None = None) -> list[str]:
     names = list(_screenshots_config()["displayTypes"]) if selected is None else selected
     for name in names:
@@ -282,6 +305,7 @@ def matrix(
         entry = display_type(name)
         job = {
             "display_type": name,
+            "platform": platform(name),
             "runs_on": entry.get("runsOn") or DEFAULT_RUNS_ON,
             "xcode_version": xcode_version(name),
         }
@@ -507,7 +531,7 @@ def main() -> int:
         "command",
         choices=(
             "app", "languages", "scenes", "devices", "sizes", "derive-from", "display-types", "bundle-id",
-            "xcode-version", "developer-dir",
+            "xcode-version", "developer-dir", "platform",
         ),
     )
     parser.add_argument("argument", nargs="?", default=None)
@@ -538,6 +562,10 @@ def main() -> int:
         if not args.argument:
             raise SystemExit("表示サイズ（例: APP_IPHONE_61）を指定してください")
         print(display_type(args.argument).get("deriveFrom") or "")
+    elif args.command == "platform":
+        if not args.argument:
+            raise SystemExit("表示サイズ（例: APP_APPLE_VISION_PRO）を指定してください")
+        print(platform(args.argument))
     elif args.command in ("xcode-version", "developer-dir"):
         if not args.argument:
             raise SystemExit("表示サイズ（例: APP_IPHONE_67）を指定してください")
