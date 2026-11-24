@@ -91,12 +91,70 @@
           }
         },
         "googleServiceInfo": {
-          "description": "Secret GOOGLE_SERVICE_INFO_PLIST_BASE64 を書き出す GoogleService-Info.plist のパス（リポジトリの直下から）。Secret が無ければ書き出さずに注釈で知らせる。使わなければ null",
+          "description": "Secret GOOGLE_SERVICE_INFO_PLIST_BASE64 を書き出す GoogleService-Info.plist のパス（リポジトリの直下から）。Secret が無ければ書き出さずに注釈で知らせる。使わなければ null。archive.configurations を書いたら使わない（構成ごとの googleServiceInfo に書く）",
           "type": [
             "string",
             "null"
           ],
           "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+/-]*/GoogleService-Info\\.plist$"
+        },
+        "configurations": {
+          "description": "Archive するビルドの構成の並び（v1.6.0）。上から順に見て、branches がブランチに合う最初の構成で Archive する。branches の無い構成はどのブランチにも合う（最後に 1 つだけ）。手動の実行は入力 configuration で名前を選べる。省くと Release と archive.googleServiceInfo",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "description": "xcodebuild -configuration に渡すビルドの構成の名前",
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+-]*$"
+              },
+              "branches": {
+                "description": "この構成で Archive するブランチのパターン（* は / もまたぐ。ほかの特別な文字は使わない）。省くとどのブランチにも合う",
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_.*][A-Za-z0-9_.*/-]*$"
+                }
+              },
+              "googleServiceInfo": {
+                "description": "この構成で Secret から書き出す GoogleService-Info の plist。使わなければ省く",
+                "type": "object",
+                "required": [
+                  "path",
+                  "secret"
+                ],
+                "properties": {
+                  "path": {
+                    "description": "書き出す先（リポジトリの直下から）。ファイル名は GoogleService-Info で始まる .plist",
+                    "type": "string",
+                    "pattern": "^([A-Za-z0-9_][A-Za-z0-9_.+-]*/)*GoogleService-Info[A-Za-z0-9_.+-]*\\.plist$"
+                  },
+                  "secret": {
+                    "description": "読む Secret（再利用ワークフローに名前を決めて渡すので、この 3 つに限る）",
+                    "enum": [
+                      "GOOGLE_SERVICE_INFO_PLIST_BASE64",
+                      "GOOGLE_SERVICE_INFO_PLIST_DEV",
+                      "GOOGLE_SERVICE_INFO_PLIST_PROD"
+                    ]
+                  },
+                  "required": {
+                    "description": "true なら、Upload するときに Secret が無ければ止める（Firebase に繋がらないビルドを上げない）。省くと false（注釈を出して進む）",
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "crashlytics": {
+          "description": "Upload するときに、書き出した GoogleService-Info の plist で dSYM を Crashlytics に上げるか（SPM が取ってきた firebase-ios-sdk の Crashlytics/upload-symbols。v1.6.0）。省くと false",
+          "type": "boolean"
         }
       }
     },

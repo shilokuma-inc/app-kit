@@ -111,6 +111,28 @@ expect_error "archive.platforms が空" '{"v":1,"project":"App.xcodeproj","schem
 expect_error "archive.platforms に知らない値" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"platforms":["tvOS"]}}' "archive.platforms は"
 expect_error "googleServiceInfo が別のファイル" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"googleServiceInfo":"App/Info.plist"}}' "archive.googleServiceInfo は"
 expect_error "googleServiceInfo が外を指す" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"googleServiceInfo":"../x/GoogleService-Info.plist"}}' "archive.googleServiceInfo は"
+expect_ok "構成の並びと Crashlytics" \
+  '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","branches":["main","release/*"],"googleServiceInfo":{"path":"App/Firebase/GoogleService-Info-Prod.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_PROD","required":true}},{"name":"Stg","googleServiceInfo":{"path":"App/Firebase/GoogleService-Info-Dev.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_DEV"}}],"crashlytics":true}}' \
+  "APP_KIT_CRASHLYTICS=true" "APP_KIT_GOOGLE_SERVICE_INFO=" \
+  'APP_KIT_ARCHIVE_CONFIGURATIONS_JSON=[{"name":"Release","branches":["main","release/*"],"googleServiceInfo":{"path":"App/Firebase/GoogleService-Info-Prod.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_PROD","required":true}},{"name":"Stg","branches":null,"googleServiceInfo":{"path":"App/Firebase/GoogleService-Info-Dev.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_DEV","required":false}}]'
+expect_ok "構成の並びが無ければ Release と今までの googleServiceInfo" \
+  '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"googleServiceInfo":"App/GoogleService-Info.plist"}}' \
+  "APP_KIT_CRASHLYTICS=false" \
+  'APP_KIT_ARCHIVE_CONFIGURATIONS_JSON=[{"name":"Release","branches":null,"googleServiceInfo":{"path":"App/GoogleService-Info.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_BASE64","required":false}}]'
+expect_error "archive.crashlytics が文字" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"crashlytics":"yes"}}' "archive.crashlytics は"
+expect_error "configurations が空" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[]}}' "archive.configurations は 1 つ以上"
+expect_error "configurations と googleServiceInfo の両方" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"googleServiceInfo":"App/GoogleService-Info.plist","configurations":[{"name":"Release"}]}}' "両方は書けません"
+expect_error "構成の名前が重なる" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","branches":["main"]},{"name":"Release"}]}}' "name が重なっています"
+expect_error "構成の名前が - で始まる" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"-quiet"}]}}' "archive.configurations[0].name の形"
+expect_error "branches を省いた構成が 2 つ" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"A"},{"name":"B"}]}}' "branches を省けるのは 1 つだけ"
+expect_error "branches を省いた構成が最後でない" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Stg"},{"name":"Release","branches":["main"]}]}}' "最後に置いてください"
+expect_error "branches に ? を使う" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","branches":["release/?"]}]}}' "archive.configurations[0].branches は"
+expect_error "branches が空" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","branches":[]}]}}' "archive.configurations[0].branches は"
+expect_error "plist のファイル名が違う" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","googleServiceInfo":{"path":"App/Info.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_PROD"}}]}}' "googleServiceInfo.path は"
+expect_error "plist が外を指す" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","googleServiceInfo":{"path":"../GoogleService-Info.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_PROD"}}]}}' "googleServiceInfo.path は"
+expect_error "知らない Secret" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","googleServiceInfo":{"path":"App/GoogleService-Info.plist","secret":"APPLE_API_KEY_BASE64"}}]}}' "googleServiceInfo.secret は"
+expect_error "required が文字" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","googleServiceInfo":{"path":"App/GoogleService-Info.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_PROD","required":"yes"}}]}}' "googleServiceInfo.required は"
+expect_error "構成がオブジェクトでない" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":["Release"]}}' "archive.configurations[0] はオブジェクト"
 expect_error "理由をすべて出す" '{"v":1,"project":"App","scheme":"","platforms":["iOS"]}' "scheme の形"
 
 if [[ "$failures" -gt 0 ]]; then
