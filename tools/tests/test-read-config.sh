@@ -53,18 +53,18 @@ expect_error() {
 expect_ok "最小の設定" \
   '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"]}' \
   "APP_KIT_PROJECT=App.xcodeproj" "APP_KIT_SCHEME=App" "APP_KIT_PLATFORMS=iOS" "APP_KIT_TEST_PLATFORM=iOS" \
-  "APP_KIT_GENERATE=" "APP_KIT_UI_TESTS=" "APP_KIT_XCODE_VERSION=26.6" "APP_KIT_SWIFTLINT=true" "APP_KIT_SWIFT_PACKAGES=" \
+  "APP_KIT_GENERATE=" "APP_KIT_UI_TESTS=" "APP_KIT_XCODE_VERSION=27.1" "APP_KIT_RUNS_ON=xcode-27" "APP_KIT_SWIFTLINT=true" "APP_KIT_SWIFT_PACKAGES=" \
   "APP_KIT_ARCHIVE_PLATFORMS=iOS" 'APP_KIT_ARCHIVE_PLATFORMS_JSON=["iOS"]' "APP_KIT_GOOGLE_SERVICE_INFO="
 
 expect_ok "すべての欄" \
   '{"v":1,"project":"Sub/App.xcodeproj","scheme":"App-iOS","platforms":["macOS","iOS","visionOS"],"generate":"xcodegen","uiTests":"AppUITests","xcodeVersion":"27.1","swiftlint":false,"swiftPackages":["Kit","Packages/Core"],"archive":{"platforms":["iOS","macOS"],"googleServiceInfo":"App/GoogleService-Info.plist"},"unmanaged":[".coderabbit.yaml"]}' \
   "APP_KIT_PROJECT=Sub/App.xcodeproj" "APP_KIT_SCHEME=App-iOS" "APP_KIT_PLATFORMS=macOS iOS visionOS" "APP_KIT_TEST_PLATFORM=macOS" \
-  "APP_KIT_GENERATE=xcodegen" "APP_KIT_UI_TESTS=AppUITests" "APP_KIT_XCODE_VERSION=27.1" "APP_KIT_SWIFTLINT=false" "APP_KIT_SWIFT_PACKAGES=Kit Packages/Core" \
+  "APP_KIT_GENERATE=xcodegen" "APP_KIT_UI_TESTS=AppUITests" "APP_KIT_XCODE_VERSION=27.1" "APP_KIT_RUNS_ON=xcode-27" "APP_KIT_SWIFTLINT=false" "APP_KIT_SWIFT_PACKAGES=Kit Packages/Core" \
   "APP_KIT_ARCHIVE_PLATFORMS=iOS macOS" 'APP_KIT_ARCHIVE_PLATFORMS_JSON=["iOS","macOS"]' "APP_KIT_GOOGLE_SERVICE_INFO=App/GoogleService-Info.plist"
 
 expect_ok "null の欄は省いたのと同じ" \
   '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"generate":null,"uiTests":null,"xcodeVersion":null}' \
-  "APP_KIT_GENERATE=" "APP_KIT_UI_TESTS=" "APP_KIT_XCODE_VERSION=26.6"
+  "APP_KIT_GENERATE=" "APP_KIT_UI_TESTS=" "APP_KIT_XCODE_VERSION=27.1" "APP_KIT_RUNS_ON=xcode-27"
 
 expect_ok "知らない欄は読み飛ばす" \
   '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"future":true}' \
@@ -100,6 +100,13 @@ expect_error "generate が違う" '{"v":1,"project":"App.xcodeproj","scheme":"Ap
 # shellcheck disable=SC2016
 expect_error "uiTests の形" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"uiTests":"$(rm -rf /)"}' "uiTests の形"
 expect_error "xcodeVersion の形" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"xcodeVersion":"latest"}' "xcodeVersion の形"
+expect_ok "Xcode 26 は macos-26 で流す" \
+  '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"xcodeVersion":"26.6"}' \
+  "APP_KIT_XCODE_VERSION=26.6" "APP_KIT_RUNS_ON=macos-26"
+expect_ok "major だけの xcodeVersion" \
+  '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"xcodeVersion":"27"}' \
+  "APP_KIT_XCODE_VERSION=27" "APP_KIT_RUNS_ON=xcode-27"
+expect_error "ランナーを知らない Xcode" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"xcodeVersion":"16.4"}' "ランナーを、この版の app-kit は知りません"
 expect_error "swiftlint が文字" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"swiftlint":"yes"}' "swiftlint は"
 expect_error "swiftPackages が外を指す" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"swiftPackages":["../Kit"]}' "swiftPackages は"
 expect_error "swiftPackages に空白" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"swiftPackages":["My Kit"]}' "swiftPackages は"
