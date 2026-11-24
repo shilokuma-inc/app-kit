@@ -144,6 +144,9 @@ jobs:
           "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
           cat "$RUNNER_TEMP/app-kit.env" >> "$GITHUB_ENV"
           echo "xcode-version=$(sed -n 's/^APP_KIT_XCODE_VERSION=//p' "$RUNNER_TEMP/app-kit.env")" >> "$GITHUB_OUTPUT"
+          # このプラットフォームのスキーム（.github/app-kit.json の schemes。無ければ scheme）で Archive する
+          schemes=$(sed -n 's/^APP_KIT_SCHEMES_JSON=//p' "$RUNNER_TEMP/app-kit.env")
+          echo "APP_KIT_ARCHIVE_SCHEME=$(jq -r --arg platform "$PLATFORM" '.[$platform]' <<<"$schemes")" >> "$GITHUB_ENV"
           case "$PLATFORM" in
             iOS) sdk=iphoneos ;;
             visionOS) sdk=xros ;;
@@ -258,7 +261,7 @@ jobs:
           if [[ "$SDK" == "macosx" ]]; then
             xcodebuild archive \
               -project "$APP_KIT_PROJECT" \
-              -scheme "$APP_KIT_SCHEME" \
+              -scheme "$APP_KIT_ARCHIVE_SCHEME" \
               -destination 'generic/platform=macOS' \
               -configuration "$APP_KIT_CONFIGURATION" \
               -archivePath "$ARCHIVE_PATH" \
@@ -268,7 +271,7 @@ jobs:
           else
             xcodebuild archive \
               -project "$APP_KIT_PROJECT" \
-              -scheme "$APP_KIT_SCHEME" \
+              -scheme "$APP_KIT_ARCHIVE_SCHEME" \
               -sdk "$SDK" \
               -configuration "$APP_KIT_CONFIGURATION" \
               -archivePath "$ARCHIVE_PATH" \
@@ -293,7 +296,7 @@ jobs:
         run: |
           python3 "$APP_KIT_DIR/tools/embed_archive_entitlements.py" embed "$ARCHIVE_PATH" \
             --project "$APP_KIT_PROJECT" \
-            --scheme "$APP_KIT_SCHEME" \
+            --scheme "$APP_KIT_ARCHIVE_SCHEME" \
             --sdk "$SDK" \
             --configuration "$APP_KIT_CONFIGURATION"
 
