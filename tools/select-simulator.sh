@@ -58,10 +58,11 @@ if [[ -z "$simulator" && "$platform" == "visionOS" ]]; then
   simulator=$(find_simulator)
 fi
 if [[ -z "$simulator" ]]; then
-  echo "::error::$device_prefix の Simulator が、SDK（$sdk_name $sdk_version）と同じか古いランタイムに見つかりません" >&2
+  echo "::error::${device_prefix} の Simulator が、SDK（${sdk_name} ${sdk_version}）と同じか古いランタイムに見つかりません" >&2
   xcrun simctl list devices available >&2
   exit 1
 fi
 
-echo "simulator: $(jq -r '"\(.name) (\(.udid))"' <<<"$simulator")（SDK $sdk_name $sdk_version）" >&2
+# 全角の文字の直前の変数は ${…} で囲む（囲まないと、ロケールによっては全角の文字まで変数の名前として読まれ、set -u で止まる）
+echo "simulator: $(jq -r '"\(.name) (\(.udid))"' <<<"$simulator")（SDK ${sdk_name} ${sdk_version}）" >&2
 jq -r .udid <<<"$simulator"
