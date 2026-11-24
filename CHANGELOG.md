@@ -5,6 +5,17 @@
 
 ## Unreleased
 
+## v1.8.0（2026-11-24）
+
+- Build・Archive・Upload の既定の Xcode を、26.6 から 27.1 に上げた。App Store Connect への Upload で altool が警告 90725（iOS 26.5 の SDK でのビルド。2027 年 4 月からは iOS 27 の SDK でないと上げられない）を出していた
+- ランナーを、Xcode の major で決めるようにした（27 は `xcode-27`、26 は `macos-26`）。GitHub の `macos-26`（`macos-latest`）には Xcode 27 が無く、Xcode 27 は `xcode-27`（macOS 27）にだけある。今までは `macos-latest` 決め打ちだった
+  - Build に、設定を読んでランナーを決める ubuntu のジョブ `plan` を足した（チェックの名前は `build / plan`。必須のチェック `build / build` は変わらない）。設定を読めないときは `build / build` も落ちる
+  - 入力 `runs-on` の既定を空にした（空なら Xcode の版から決める。渡せばそのランナー）
+- テストの Simulator を、選んだ Xcode の SDK と同じか古いランタイムから選ぶようにした（`xcode-27` の画像には、Xcode 27.1 より新しい iOS 27.2 のランタイムもある）。iPhone Duo（画面の縦横比がほかの iPhone と違う。iOS 27.1 のランタイムは iPhone Duo だけ）は選ばない
+- 撮影とクリエイティブアセットのランナーと Xcode は変えていない（撮影の既定は `macos-latest`・26.6）
+- 呼ぶ側の直しは要らない。ただし、Xcode 27.1（Swift 6.4）で落ちるコードがあるアプリは Build が落ちるようになる。よくあるのは、`Shape` などの隔離の無いプロトコルへの準拠が `#ConformanceIsolation` で落ちるもので、型に `nonisolated` を付ける（`nonisolated struct LockShape: Shape`。26.6 でも通る）。
+  直すまでの間は、`.github/app-kit.json` に `"xcodeVersion": "26.6"` を書けば今までどおり動く
+
 ## v1.6.0（2026-11-24）
 
 - Archive・Upload のビルドの構成を、ブランチで切り替えられるようにした。`.github/app-kit.json` の `archive.configurations` に、構成の名前・ブランチのパターン・書き出す `GoogleService-Info` の plist を並べる（上から順に見て最初に合ったもの。`branches` を省いた構成はどのブランチにも合う）。今までは `Release` 決め打ちだった
