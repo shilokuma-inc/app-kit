@@ -7,6 +7,8 @@
 # - entitlements のファイルは、アドホック署名（CODE_SIGN_STYLE=Manual）のときと自動の署名のときで分ける（Configs/Project.xcconfig）。
 #   自動の署名のときだけ付ける push の entitlement は、Archive の後に app-kit が足す
 # - Mac App Store に要る LSApplicationCategoryType
+# - App Extension（ウィジェット）。App Sandbox と App Groups を、アドホック署名の Archive に入る形で持つ
+#   （v1.5.0 の app-kit は macOS の中のバンドルに entitlement を足さず、Archive の署名に残ったかを確かめる）
 name: FixtureMacApp
 options:
   createIntermediateGroups: true
@@ -24,6 +26,8 @@ targets:
     platform: macOS
     sources:
       - FixtureMacApp
+    dependencies:
+      - target: FixtureMacWidget
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER)
@@ -34,6 +38,24 @@ targets:
         ENABLE_APP_SANDBOX: true
         ENABLE_HARDENED_RUNTIME: true
         ENABLE_USER_SELECTED_FILES: readonly
+  FixtureMacWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - FixtureMacWidget
+    info:
+      path: FixtureMacWidget/Info.plist
+      properties:
+        CFBundleDisplayName: FixtureMacWidget
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER).Widget
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: FixtureMacWidget/FixtureMacWidget.entitlements
+        ENABLE_APP_SANDBOX: true
+        ENABLE_HARDENED_RUNTIME: true
   FixtureMacAppTests:
     type: bundle.unit-test
     platform: macOS

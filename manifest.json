@@ -68,6 +68,9 @@
       "path": ".github/scripts/ensure-internal-testers.rb"
     },
     {
+      "path": ".github/scripts/embed-entitlements.rb"
+    },
+    {
       "path": "Tools/app_store_config.py",
       "keepIfPresent": [
         "Tools/upload_creative_assets.py",

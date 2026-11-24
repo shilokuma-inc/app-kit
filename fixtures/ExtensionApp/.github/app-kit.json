@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "project": "FixtureExtensionApp.xcodeproj",
+  "scheme": "FixtureExtensionApp",
+  "platforms": ["iOS"],
+  "swiftlint": false
+}
