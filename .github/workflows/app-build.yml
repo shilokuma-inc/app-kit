@@ -20,16 +20,59 @@ on:
         type: string
         default: '.'
       runs-on:
-        description: ランナーのラベル
+        description: ランナーのラベル。空なら Xcode の版（.github/app-kit.json の xcodeVersion か、この版の既定）が入ったランナーにする
         type: string
-        default: macos-latest
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
+  plan:
+    # ランナーは Xcode の版で決まる（Xcode 27 は xcode-27 にしか無い）。ジョブの runs-on は始まる前に決まるので、先に ubuntu で設定を読む
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    outputs:
+      runs-on: ${{ steps.config.outputs.runs-on }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Get app-kit
+        env:
+          APP_KIT_REF: ${{ inputs.app-kit-ref }}
+        run: |
+          if [[ ! "$APP_KIT_REF" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::app-kit-ref は app-kit のコミット（40 桁）にしてください: $APP_KIT_REF"
+            exit 1
+          fi
+          dir="$RUNNER_TEMP/app-kit"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/shilokuma-inc/app-kit.git "$APP_KIT_REF"
+          git -C "$dir" checkout -q --detach FETCH_HEAD
+          echo "APP_KIT_DIR=$dir" >> "$GITHUB_ENV"
+
+      - name: Read .github/app-kit.json
+        id: config
+        env:
+          RUNS_ON: ${{ inputs.runs-on }}
+        run: |
+          "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
+          runs_on="${RUNS_ON:-$(sed -n 's/^APP_KIT_RUNS_ON=//p' "$RUNNER_TEMP/app-kit.env")}"
+          echo "Xcode $(sed -n 's/^APP_KIT_XCODE_VERSION=//p' "$RUNNER_TEMP/app-kit.env") を $runs_on で流します"
+          echo "runs-on=$runs_on" >> "$GITHUB_OUTPUT"
+
   build:
-    runs-on: ${{ inputs.runs-on }}
+    needs: plan
+    # plan が落ちたときに build を skipped にすると、必須のチェック build / build が通ったことになるので、走らせてから落とす
+    if: ${{ !cancelled() }}
+    runs-on: ${{ needs.plan.outputs.runs-on || 'ubuntu-latest' }}
     # UI テスト込みで、失敗したテストの再試行のぶんも見込む
     timeout-minutes: 45
     defaults:
@@ -37,6 +80,14 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
 
     steps:
+      - name: Check plan
+        if: needs.plan.result != 'success'
+        # checkout の前なので、working-directory はまだ無い
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "::error::.github/app-kit.json を読めなかったので、ビルドしません（plan のジョブのログを見てください）"
+          exit 1
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

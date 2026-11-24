@@ -28,9 +28,9 @@ on:
         type: string
         default: '.'
       runs-on:
-        description: Archive のランナーのラベル
+        description: Archive のランナーのラベル。空なら Xcode の版（.github/app-kit.json の xcodeVersion か、この版の既定）が入ったランナーにする
         type: string
-        default: macos-latest
+        default: ''
       configuration:
         description: Archive するビルドの構成の名前（.github/app-kit.json の archive.configurations のどれか）。空ならブランチで決める
         type: string
@@ -75,6 +75,7 @@ jobs:
     outputs:
       platforms: ${{ steps.config.outputs.platforms }}
       first-platform: ${{ steps.config.outputs.first-platform }}
+      runs-on: ${{ steps.config.outputs.runs-on }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,19 +98,24 @@ jobs:
 
       - name: Read .github/app-kit.json
         id: config
+        env:
+          RUNS_ON: ${{ inputs.runs-on }}
         run: |
           "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
           cat "$RUNNER_TEMP/app-kit.env"
           platforms=$(sed -n 's/^APP_KIT_ARCHIVE_PLATFORMS_JSON=//p' "$RUNNER_TEMP/app-kit.env")
+          # ランナーは Xcode の版で決まる（Xcode 27 は xcode-27 にしか無い）。呼ぶ側が runs-on を渡せばそちら
+          runs_on="${RUNS_ON:-$(sed -n 's/^APP_KIT_RUNS_ON=//p' "$RUNNER_TEMP/app-kit.env")}"
           {
             echo "platforms=$platforms"
             echo "first-platform=$(jq -r '.[0]' <<<"$platforms")"
+            echo "runs-on=$runs_on"
           } >> "$GITHUB_OUTPUT"
 
   archive:
     name: archive (${{ matrix.platform }})
     needs: plan
-    runs-on: ${{ inputs.runs-on }}
+    runs-on: ${{ needs.plan.outputs.runs-on }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
