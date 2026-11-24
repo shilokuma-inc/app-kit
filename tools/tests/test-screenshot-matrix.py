@@ -215,6 +215,22 @@ class ScreenshotMatrixTests(unittest.TestCase):
         matrix = self.matrix("APP_IPHONE_67", "--max-parallel", "2")
         self.assertEqual([job["languages"] for job in matrix["capture"]], ["ja", "en"])
 
+    def test_selected_languages_do_not_check_other_languages(self) -> None:
+        # 一部の言語を撮り直すときは、撮らない言語の設定の不備で止めない（全言語のときは止める）
+        self.write_entries([
+            language("ja"),
+            language("en"),
+            {"language": "fr", "storeLocale": "fr-FR"},
+            {"language": "en-GB", "storeLocale": "en-GB", "assetsFrom": "en-US"},
+        ])
+        result = self.run_config("ja,en", command="languages")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([line.split("\t")[0] for line in result.stdout.splitlines()], ["ja", "en"])
+        result = self.run_config("", command="languages")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("fr に appleLanguage, appleLocale がありません", result.stderr)
+        self.assertIn("en-GB の assetsFrom（en-US）が", result.stderr)
+
     def test_rejects_wrong_assets_from(self) -> None:
         cases = {
             "流用元が無い": ([language("ja"), {"language": "en-GB", "storeLocale": "en-GB", "assetsFrom": "en"}], "en-GB の assetsFrom（en）が"),
