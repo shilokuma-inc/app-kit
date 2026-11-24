@@ -15,7 +15,7 @@ AskHub で開発する Apple のアプリのリポジトリに、CI・リリー�
 | `.github/workflows/self-test.yml` | app-kit 自身の確かめ（`fixtures/` のアプリに再利用ワークフローを流す） |
 | `tools/` | 再利用ワークフローが、呼ばれた版の app-kit を取り出して使う道具 |
 | `schema/` | 各リポジトリの設定（`.github/app-kit.json`）と、クリエイティブアセットの案（`creative-spec.schema.json`）の形 |
-| `fixtures/` | 確かめ用の小さなアプリ（iOS の `App`・macOS の `MacApp`） |
+| `fixtures/` | 確かめ用の小さなアプリ（iOS の `App`・macOS の `MacApp`・ウィジェットを持つ iOS の `ExtensionApp`） |
 | `managed/` | 各リポジトリに写すファイル（置き場所と同じ並び）。呼ぶ側のワークフローは版を `{{APP_KIT_REF}}`・`{{APP_KIT_VERSION}}` の目印で持つ |
 | `manifest.json` | 写すファイルの一覧（`managed`）と、初めての入れ替えで外すファイル（`replaces`。`keepIfPresent` のファイルがあれば外さない） |
 
@@ -27,6 +27,19 @@ AskHub の司令塔が、案（文言・色・使う画面。`schema/creative-sp
 - 端末に載せる画面は、6.9 inch の撮影の artifact `screenshots-APP_IPHONE_67`。入力 `screenshots_run` に前の実行の id を渡すと、撮り直さずにその画面を使う
 - 雛形は `tools/creative/creative.html`。文字は安全領域に収め、はみ出しなどは `creative-report` の `report.json` に出す
 - 手元で書き出しを確かめる: `bash tools/tests/test-creative-render.sh`（Chrome と Xcode が要る）
+
+## entitlements と App Extension
+
+Archive の後に、本体と中のバンドル（App Extension・App Clip・system extension・XPC サービス。`.framework` の中は除く）へ、
+各ターゲットの `CODE_SIGN_ENTITLEMENTS` のファイル（`$(…)` をビルドの設定で展開したもの）を、内側から順にアドホック署名で入れる。
+Export は Archive の各バンドルの署名にある entitlement だけを引き継ぐので、署名なしの Archive のままでは、ウィジェットの App Groups などが配信ビルドから抜ける。
+
+- 中のバンドルのターゲットは、`-alltargets` のビルドの設定から製品の名前（`FULL_PRODUCT_NAME`）で選ぶ。見つからない・1 つに決まらないときは止める。
+  watchOS のアプリ（Archive したプラットフォームと違うバンドル）は、ビルドの設定を正しく読めないので止める
+- 書き出した IPA・pkg の各バンドルに、Archive の署名とソースの entitlements のキーが残ったかを確かめ、抜けていれば Upload の前に止める
+- バンドルごとの entitlements（Archive と書き出したもの）を、artifact `entitlements-<プラットフォーム>`（JSON）と Job Summary に出す。IPA・pkg は上げない
+- macOS の中のバンドルには足さない（Archive のアドホック署名のまま）。下の「自動の署名のときだけ付ける」形は本体にだけ使える。
+  中のバンドルの entitlements のファイルに、アドホック署名の Archive に入らない項目があれば止める
 
 ## macOS のアプリ
 

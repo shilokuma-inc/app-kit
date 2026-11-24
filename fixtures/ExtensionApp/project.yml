@@ -1,0 +1,57 @@
+# fixtures/ExtensionApp の XcodeGen の定義。FixtureExtensionApp.xcodeproj はこれから作ってコミットしている
+# （self-test でランナーに XcodeGen を入れないため。.github/app-kit.json の generate は null）。
+# 直したら fixtures/ExtensionApp で `xcodegen generate` を流し、作り直した FixtureExtensionApp.xcodeproj も一緒にコミットする。
+#
+# App Extension を持つアプリの Archive で確かめたいことを入れている（self-test は Archive だけを流す）:
+# - アプリとウィジェットの両方が、App Groups を entitlements のファイルで持つ（shariverse/oshikatsu-countdown-ios と同じ形）。
+#   署名なしの Archive には入らないので、app-kit が内側（ウィジェット）から署名して入れる
+# - ウィジェットのターゲットは Scheme の build に書かない（アプリの依存として作られる）。`-scheme` のビルドの設定には出ない
+name: FixtureExtensionApp
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "17.0"
+configFiles:
+  Debug: Configs/Debug.xcconfig
+  Release: Configs/Release.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+targets:
+  FixtureExtensionApp:
+    type: application
+    platform: iOS
+    sources:
+      - FixtureExtensionApp
+    dependencies:
+      - target: FixtureExtensionWidget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER)
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_UILaunchScreen_Generation: true
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: FixtureExtensionApp/FixtureExtensionApp.entitlements
+  FixtureExtensionWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - FixtureExtensionWidget
+    info:
+      path: FixtureExtensionWidget/Info.plist
+      properties:
+        CFBundleDisplayName: FixtureExtensionWidget
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_IDENTIFIER).Widget
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: FixtureExtensionWidget/FixtureExtensionWidget.entitlements
+schemes:
+  FixtureExtensionApp:
+    build:
+      targets:
+        FixtureExtensionApp: all
+    archive:
+      config: Release

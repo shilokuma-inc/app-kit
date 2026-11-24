@@ -10,7 +10,9 @@
 		09C024EC11270AC6ED747E0A /* FixtureMacAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0A08E7482AFFD0035E76C5 /* FixtureMacAppTests.swift */; };
 		0BBFAA66C5A85656CBB583BA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A57C28ACF16D2D4974ABBF9 /* ContentView.swift */; };
 		31EED202701B8166E4F9EDEE /* FixtureMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75A79248E6AA35159DBC118 /* FixtureMacApp.swift */; };
+		447282AA60C2FA4CDF17344C /* FixtureMacWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB376FAEDA58E24A33BED330 /* FixtureMacWidget.swift */; };
 		727CFDCBA9DFC061B6F86CFD /* FixtureMacAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 386E4D30C1270082E94E8A8A /* FixtureMacAppUITests.swift */; };
+		A4D7C9F7D855B9C18D1C8B5E /* FixtureMacWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 316D86E8B38962FC01A51D85 /* FixtureMacWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,6 +23,13 @@
 			remoteGlobalIDString = A194AE52EB360AF18B42A5CF;
 			remoteInfo = FixtureMacApp;
 		};
+		96F12212E21A66852B6265F3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2A9FD05AC53478FCE87F7B5B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3B276530DEFFDE259C161AB8;
+			remoteInfo = FixtureMacWidget;
+		};
 		9ECBE2650586842A2B6AEED4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 2A9FD05AC53478FCE87F7B5B /* Project object */;
@@ -30,16 +39,34 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		A3CBAE506CBEB5D0D7402194 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A4D7C9F7D855B9C18D1C8B5E /* FixtureMacWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		316D86E8B38962FC01A51D85 /* FixtureMacWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FixtureMacWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		386E4D30C1270082E94E8A8A /* FixtureMacAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureMacAppUITests.swift; sourceTree = "<group>"; };
 		6B91172F3FF8CE31C629F6B3 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		7434061B9D2A48D08DA9BF17 /* FixtureMacApp-Distribution.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "FixtureMacApp-Distribution.entitlements"; sourceTree = "<group>"; };
 		8A57C28ACF16D2D4974ABBF9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		916B901051025B68BED6257E /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		9FCCC1EF9406B0EB0EEA7840 /* FixtureMacAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FixtureMacAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3528F6D42691FBC72653FFA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B42203C4CAE90DBB67AB45DA /* FixtureMacAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FixtureMacAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		C184EB809E3A9DCEFC7351C4 /* FixtureMacApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FixtureMacApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C8CAE44EC9F92B4640C23E14 /* FixtureMacWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FixtureMacWidget.entitlements; sourceTree = "<group>"; };
 		CD0A08E7482AFFD0035E76C5 /* FixtureMacAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureMacAppTests.swift; sourceTree = "<group>"; };
+		DB376FAEDA58E24A33BED330 /* FixtureMacWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureMacWidget.swift; sourceTree = "<group>"; };
 		E75A79248E6AA35159DBC118 /* FixtureMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureMacApp.swift; sourceTree = "<group>"; };
 		EC1681DB6C122475B94E0F84 /* FixtureMacApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FixtureMacApp.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -60,6 +87,7 @@
 				D0279C8E197EC989D1876FCF /* FixtureMacApp */,
 				05355BB277AE8AFC761D002B /* FixtureMacAppTests */,
 				B47A4F17AC85D1894710ECB4 /* FixtureMacAppUITests */,
+				D9AA60142C0140D697989033 /* FixtureMacWidget */,
 				7AA469338CDF2A65146D66A1 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -70,6 +98,7 @@
 				C184EB809E3A9DCEFC7351C4 /* FixtureMacApp.app */,
 				9FCCC1EF9406B0EB0EEA7840 /* FixtureMacAppTests.xctest */,
 				B42203C4CAE90DBB67AB45DA /* FixtureMacAppUITests.xctest */,
+				316D86E8B38962FC01A51D85 /* FixtureMacWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -102,9 +131,36 @@
 			path = FixtureMacApp;
 			sourceTree = "<group>";
 		};
+		D9AA60142C0140D697989033 /* FixtureMacWidget */ = {
+			isa = PBXGroup;
+			children = (
+				C8CAE44EC9F92B4640C23E14 /* FixtureMacWidget.entitlements */,
+				DB376FAEDA58E24A33BED330 /* FixtureMacWidget.swift */,
+				B3528F6D42691FBC72653FFA /* Info.plist */,
+			);
+			path = FixtureMacWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3B276530DEFFDE259C161AB8 /* FixtureMacWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AEB9F59908E4C81410A3A8EE /* Build configuration list for PBXNativeTarget "FixtureMacWidget" */;
+			buildPhases = (
+				13A12F60DA95F460C3BDC0C9 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FixtureMacWidget;
+			packageProductDependencies = (
+			);
+			productName = FixtureMacWidget;
+			productReference = 316D86E8B38962FC01A51D85 /* FixtureMacWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		87AB840C017AFC7C87A97A70 /* FixtureMacAppUITests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 710AADE8BB1A64A76C0A3EA4 /* Build configuration list for PBXNativeTarget "FixtureMacAppUITests" */;
@@ -128,10 +184,12 @@
 			buildConfigurationList = 4024E9A02BE422D9E85AFABF /* Build configuration list for PBXNativeTarget "FixtureMacApp" */;
 			buildPhases = (
 				5D814179790FBEADC62BD450 /* Sources */,
+				A3CBAE506CBEB5D0D7402194 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				7C2E5E5A222B964FF7ED2801 /* PBXTargetDependency */,
 			);
 			name = FixtureMacApp;
 			packageProductDependencies = (
@@ -167,6 +225,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					3B276530DEFFDE259C161AB8 = {
+						DevelopmentTeam = XU74X3434S;
+						ProvisioningStyle = Automatic;
+					};
 					87AB840C017AFC7C87A97A70 = {
 						DevelopmentTeam = XU74X3434S;
 						TestTargetID = A194AE52EB360AF18B42A5CF;
@@ -195,6 +257,7 @@
 			projectRoot = "";
 			targets = (
 				A194AE52EB360AF18B42A5CF /* FixtureMacApp */,
+				3B276530DEFFDE259C161AB8 /* FixtureMacWidget */,
 				BCDEF8DB5B84F3AF99131DDD /* FixtureMacAppTests */,
 				87AB840C017AFC7C87A97A70 /* FixtureMacAppUITests */,
 			);
@@ -202,6 +265,14 @@
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
+		13A12F60DA95F460C3BDC0C9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				447282AA60C2FA4CDF17344C /* FixtureMacWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5D814179790FBEADC62BD450 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -234,6 +305,11 @@
 			isa = PBXTargetDependency;
 			target = A194AE52EB360AF18B42A5CF /* FixtureMacApp */;
 			targetProxy = 3F26D490047B1D4259F29F1B /* PBXContainerItemProxy */;
+		};
+		7C2E5E5A222B964FF7ED2801 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3B276530DEFFDE259C161AB8 /* FixtureMacWidget */;
+			targetProxy = 96F12212E21A66852B6265F3 /* PBXContainerItemProxy */;
 		};
 		C591C3706806772F8421B71C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -276,6 +352,25 @@
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FixtureMacApp.app/Contents/MacOS/FixtureMacApp";
 			};
 			name = Debug;
+		};
+		448099E0FCCD4D3E0D061FD6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FixtureMacWidget/FixtureMacWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = FixtureMacWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).Widget";
+				SDKROOT = macosx;
+			};
+			name = Release;
 		};
 		590FD6BE7A51CC3BB39FA139 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -409,6 +504,25 @@
 			};
 			name = Debug;
 		};
+		C2CBE42B93CA5CE665F9B506 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FixtureMacWidget/FixtureMacWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = FixtureMacWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "$(APP_BUNDLE_IDENTIFIER).Widget";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
 		EF359A1E3EC0C317CBE74B13 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 916B901051025B68BED6257E /* Debug.xcconfig */;
@@ -507,6 +621,15 @@
 			buildConfigurations = (
 				EF359A1E3EC0C317CBE74B13 /* Debug */,
 				590FD6BE7A51CC3BB39FA139 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AEB9F59908E4C81410A3A8EE /* Build configuration list for PBXNativeTarget "FixtureMacWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2CBE42B93CA5CE665F9B506 /* Debug */,
+				448099E0FCCD4D3E0D061FD6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

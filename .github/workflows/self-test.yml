@@ -1,4 +1,4 @@
-# app-kit 自身の確かめ。道具の確かめと、fixtures/App に対して再利用ワークフローを流す。
+# app-kit 自身の確かめ。道具の確かめと、fixtures/ のアプリ（App・MacApp・ExtensionApp）に対して再利用ワークフローを流す。
 # ルールセットで必須にするチェック（tools・build / build）が、ドキュメントだけの PR でも出るよう、paths で絞らない
 name: self-test
 
@@ -102,6 +102,15 @@ jobs:
       export: false
       working-directory: fixtures/App
 
+  archive-extension:
+    # App Extension（ウィジェット）を持つ iOS のアプリ（fixtures/ExtensionApp）。署名なしの Archive に、ウィジェットから順に
+    # App Groups を入れる（鍵の要らないところまで。Build は fixtures/App で確かめるので流さない）
+    uses: ./.github/workflows/app-archive.yml
+    with:
+      app-kit-ref: ${{ github.sha }}
+      export: false
+      working-directory: fixtures/ExtensionApp
+
   build-macos:
     # macOS だけのアプリ（fixtures/MacApp）。テストはアドホック署名・App Sandbox なしで流す
     uses: ./.github/workflows/app-build.yml
@@ -110,13 +119,49 @@ jobs:
       working-directory: fixtures/MacApp
 
   archive-macos:
-    # macOS はアドホック署名で Archive し、自動の署名のときだけ付ける entitlement（push）を足して、
-    # Mac App Store に要る App Sandbox とカテゴリを確かめる（鍵の要らないところまで）
+    # macOS はアドホック署名で Archive し、自動の署名のときだけ付ける entitlement（push）を本体に足して、
+    # Mac App Store に要る App Sandbox とカテゴリを確かめる（鍵の要らないところまで）。ウィジェットの entitlements は Archive のまま
     uses: ./.github/workflows/app-archive.yml
     with:
       app-kit-ref: ${{ github.sha }}
       export: false
       working-directory: fixtures/MacApp
+
+  archive-entitlements:
+    # Archive のジョブが上げた entitlements の記録で、本体と中のバンドルの署名に、入れるはずの entitlements があるかを確かめる
+    # （ウィジェットを見落とすと、Archive のジョブは通っても記録にウィジェットが無い・キーが足りない）
+    needs: [archive, archive-extension, archive-macos]
+    name: archive-entitlements
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download entitlements records
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: entitlements-*
+          path: ${{ runner.temp }}/entitlements
+
+      - name: Check records
+        run: |
+          records="$RUNNER_TEMP/entitlements"
+          echo "::group::fixtures/App（entitlements なし。署名しない）"
+          python3 tools/tests/check_entitlements_record.py "$records/entitlements-iOS-fixtures-App/archive.json" 'FixtureApp.app='
+          echo "::endgroup::"
+          echo "::group::fixtures/ExtensionApp（本体とウィジェットに App Groups）"
+          python3 tools/tests/check_entitlements_record.py "$records/entitlements-iOS-fixtures-ExtensionApp/archive.json" \
+            'FixtureExtensionApp.app=com.apple.security.application-groups' \
+            'FixtureExtensionApp.app/PlugIns/FixtureExtensionWidget.appex=com.apple.security.application-groups'
+          echo "::endgroup::"
+          echo "::group::fixtures/MacApp（本体に push を足し、ウィジェットは Archive の sandbox と App Groups のまま）"
+          python3 tools/tests/check_entitlements_record.py "$records/entitlements-macOS-fixtures-MacApp/archive.json" \
+            'FixtureMacApp.app=com.apple.developer.aps-environment,com.apple.security.app-sandbox,com.apple.security.application-groups,com.apple.security.files.user-selected.read-only' \
+            'FixtureMacApp.app/Contents/PlugIns/FixtureMacWidget.appex=com.apple.security.app-sandbox,com.apple.security.application-groups'
+          echo "::endgroup::"
 
   creative-render:
     # クリエイティブアセットの書き出しの道具を、仮の画面と見本の案で確かめる（はみ出し・無い画面・再現性）
