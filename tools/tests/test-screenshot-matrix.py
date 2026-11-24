@@ -193,6 +193,47 @@ class ScreenshotMatrixTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("max_parallel は 1〜5", result.stderr)
 
+    def write_entries(self, entries: list[dict]) -> None:
+        (self.root / "AppStore" / "languages.json").write_text(json.dumps({"languages": entries}), encoding="utf-8")
+
+    def test_assets_from_languages_are_not_captured(self) -> None:
+        # ninjacord-ios と同じ形（en-GB・es-MX は en の画像を流用し、appleLanguage・appleLocale を持たない）
+        self.write_entries([
+            language("ja"),
+            language("en"),
+            {"language": "en-GB", "storeLocale": "en-GB", "assetsFrom": "en"},
+            {"language": "es-MX", "storeLocale": "es-MX", "assetsFrom": "en"},
+        ])
+        result = self.run_config("", command="languages")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([line.split("\t")[0] for line in result.stdout.splitlines()], ["ja", "en"])
+        # 流用する言語だけを指定したら、流用元を撮る
+        result = self.run_config("en-GB,es-MX", command="languages")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([line.split("\t")[0] for line in result.stdout.splitlines()], ["en"])
+        # 撮影の matrix の言語の分け方も、撮る言語（ja・en）で数える
+        matrix = self.matrix("APP_IPHONE_67", "--max-parallel", "2")
+        self.assertEqual([job["languages"] for job in matrix["capture"]], ["ja", "en"])
+
+    def test_rejects_wrong_assets_from(self) -> None:
+        cases = {
+            "流用元が無い": ([language("ja"), {"language": "en-GB", "storeLocale": "en-GB", "assetsFrom": "en"}], "en-GB の assetsFrom（en）が"),
+            "流用元も流用する": ([
+                language("en"),
+                {"language": "en-GB", "storeLocale": "en-GB", "assetsFrom": "en"},
+                {"language": "en-AU", "storeLocale": "en-AU", "assetsFrom": "en-GB"},
+            ], "en-AU の assetsFrom（en-GB）も流用する言語"),
+            "流用する言語に撮影の設定": ([language("en"), {"language": "en-GB", "storeLocale": "en-GB", "assetsFrom": "en", "appleLocale": "en_GB"}],
+                                     "en-GB は en の画像を流用するので appleLocale は書かない"),
+            "撮る言語に撮影の設定が無い": ([{"language": "ja", "storeLocale": "ja"}], "ja に appleLanguage, appleLocale がありません"),
+        }
+        for name, (entries, message) in cases.items():
+            with self.subTest(name):
+                self.write_entries(entries)
+                result = self.run_config("", command="languages")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(message, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
