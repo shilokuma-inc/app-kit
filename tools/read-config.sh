@@ -70,6 +70,15 @@ problems=$(jq -r '
     (if .v != 1 then "v が 1 ではありません（\(.v | tojson)）" else empty end),
     (if (.project | is_path and endswith(".xcodeproj")) | not then "project は .xcodeproj のパスにしてください（\(.project | tojson)）" else empty end),
     (if (.scheme | is_name) | not then "scheme の形が合いません（\(.scheme | tojson)）" else empty end),
+    (if .schemes != null and (.schemes | type != "object")
+      then "schemes はプラットフォームからスキームへのオブジェクトにしてください（\(.schemes | tojson)）" else empty end),
+    (if (.schemes | type == "object") then
+      ([.platforms, .archive.platforms] | map(if type == "array" then .[] else empty end)) as $platforms
+      | .schemes | to_entries[]
+      | (if ([.key] | inside($platforms)) | not
+          then "schemes の \(.key | tojson) は platforms・archive.platforms にあるプラットフォームにしてください" else empty end),
+        (if (.value | is_name) | not then "schemes の \(.key) のスキームの形が合いません（\(.value | tojson)）" else empty end)
+     else empty end),
     (if (.platforms | type == "array" and length > 0 and all(.[]; . == "iOS" or . == "macOS" or . == "visionOS") and (unique | length) == length) | not
       then "platforms は iOS・macOS・visionOS のうち 1 つ以上の重ならない並びにしてください（\(.platforms | tojson)）" else empty end),
     (if .generate != null and .generate != "xcodegen" then "generate は null か \"xcodegen\" にしてください（\(.generate | tojson)）" else empty end),
@@ -114,6 +123,10 @@ fi
 jq -r --arg default_xcode "$DEFAULT_XCODE_VERSION" '
   "APP_KIT_PROJECT=\(.project)",
   "APP_KIT_SCHEME=\(.scheme)",
+  # プラットフォームごとのスキーム（schemes に無いプラットフォームは scheme）。テストは先頭のプラットフォームのスキームで流す
+  "APP_KIT_SCHEMES_JSON=\(.scheme as $scheme | (.schemes // {}) as $schemes
+    | [.platforms[], (.archive.platforms // [])[]] | unique | map({key: ., value: ($schemes[.] // $scheme)}) | from_entries | tojson)",
+  "APP_KIT_TEST_SCHEME=\((.schemes // {})[.platforms[0]] // .scheme)",
   "APP_KIT_PLATFORMS=\(.platforms | join(" "))",
   "APP_KIT_TEST_PLATFORM=\(.platforms[0])",
   "APP_KIT_GENERATE=\(.generate // "")",

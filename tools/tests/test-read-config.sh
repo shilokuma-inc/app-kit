@@ -133,6 +133,21 @@ expect_error "plist が外を指す" '{"v":1,"project":"App.xcodeproj","scheme":
 expect_error "知らない Secret" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","googleServiceInfo":{"path":"App/GoogleService-Info.plist","secret":"APPLE_API_KEY_BASE64"}}]}}' "googleServiceInfo.secret は"
 expect_error "required が文字" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":[{"name":"Release","googleServiceInfo":{"path":"App/GoogleService-Info.plist","secret":"GOOGLE_SERVICE_INFO_PLIST_PROD","required":"yes"}}]}}' "googleServiceInfo.required は"
 expect_error "構成がオブジェクトでない" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"archive":{"configurations":["Release"]}}' "archive.configurations[0] はオブジェクト"
+expect_ok "schemes が無ければどのプラットフォームも scheme" \
+  '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS","macOS"]}' \
+  'APP_KIT_SCHEMES_JSON={"iOS":"App","macOS":"App"}' "APP_KIT_TEST_SCHEME=App"
+expect_ok "プラットフォームごとのスキーム" \
+  '{"v":1,"project":"Kawarin.xcodeproj","scheme":"Kawarin","schemes":{"macOS":"KawarinMac"},"platforms":["iOS","macOS"]}' \
+  "APP_KIT_SCHEME=Kawarin" 'APP_KIT_SCHEMES_JSON={"iOS":"Kawarin","macOS":"KawarinMac"}' "APP_KIT_TEST_SCHEME=Kawarin"
+expect_ok "先頭のプラットフォームのスキームでテストする" \
+  '{"v":1,"project":"Kawarin.xcodeproj","scheme":"Kawarin","schemes":{"macOS":"KawarinMac"},"platforms":["macOS","iOS"]}' \
+  "APP_KIT_TEST_SCHEME=KawarinMac"
+expect_ok "Archive だけのプラットフォームにもスキームがある" \
+  '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"schemes":{"macOS":"AppMac"},"archive":{"platforms":["iOS","macOS"]}}' \
+  'APP_KIT_SCHEMES_JSON={"iOS":"App","macOS":"AppMac"}'
+expect_error "schemes がオブジェクトでない" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"schemes":["AppMac"]}' "schemes はプラットフォームから"
+expect_error "schemes に platforms に無いプラットフォーム" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS"],"schemes":{"macOS":"AppMac"}}' 'schemes の "macOS" は platforms・archive.platforms にある'
+expect_error "schemes のスキームが - で始まる" '{"v":1,"project":"App.xcodeproj","scheme":"App","platforms":["iOS","macOS"],"schemes":{"macOS":"-quiet"}}' "schemes の macOS のスキームの形"
 expect_error "理由をすべて出す" '{"v":1,"project":"App","scheme":"","platforms":["iOS"]}' "scheme の形"
 
 if [[ "$failures" -gt 0 ]]; then

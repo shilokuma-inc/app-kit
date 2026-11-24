@@ -24,6 +24,21 @@
       "type": "string",
       "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+-]*$"
     },
+    "schemes": {
+      "description": "プラットフォームごとのスキーム（v1.6.0）。scheme と違うプラットフォームだけを書く（kawarin-apple の macOS 版の KawarinMac など）。キーは platforms・archive.platforms にあるもの。テストは先頭のプラットフォームのスキームで流し、Archive はプラットフォームごとのスキームで作る",
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "iOS",
+          "macOS",
+          "visionOS"
+        ]
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+-]*$"
+      }
+    },
     "platforms": {
       "description": "ビルドとテストの行き先。先頭でテストを流し、残りはビルドだけを確かめる",
       "type": "array",
