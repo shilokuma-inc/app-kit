@@ -41,6 +41,31 @@ iOS と macOS を出すアプリは `archive.platforms` に両方を書く（プ
 - App Store Connect のアプリに macOS のプラットフォームがまだ無いときは、macOS の Upload だけを飛ばし、追加の手順を Job Summary に出す
 - macOS のスクショ・クリエイティブアセットは扱わない（撮れない表示サイズは撮影の plan が止める）。macOS だけのアプリは、`unmanaged` に `.github/workflows/app-store-screenshots.yml`・`.github/workflows/app-store-creative.yml` を入れる
 
+## 構成の切り替えと Firebase
+
+Archive・Upload は、既定では `Release` で作り、`archive.googleServiceInfo` があれば Secret `GOOGLE_SERVICE_INFO_PLIST_BASE64` を書き出す。
+ブランチで構成を変えるアプリ（develop の TestFlight は Stg、`release/**` と main は Release など）は、`archive.configurations` を書く（v1.6.0）。
+
+```json
+"archive": {
+  "configurations": [
+    {
+      "name": "Release",
+      "branches": ["main", "release/*"],
+      "googleServiceInfo": { "path": "App/Firebase/GoogleService-Info-Prod.plist", "secret": "GOOGLE_SERVICE_INFO_PLIST_PROD", "required": true }
+    },
+    { "name": "Stg", "googleServiceInfo": { "path": "App/Firebase/GoogleService-Info-Dev.plist", "secret": "GOOGLE_SERVICE_INFO_PLIST_DEV" } }
+  ],
+  "crashlytics": true
+}
+```
+
+- 上から順に見て、`branches` のパターン（`*` は `/` もまたぐ）がブランチに合う最初の構成で Archive する。`branches` を省いた構成はどのブランチにも合う（最後に 1 つだけ置ける）
+- 手動の実行（Archive・Upload）は、入力 `configuration` で構成の名前を選べる（空ならブランチで決める）
+- `secret` は `GOOGLE_SERVICE_INFO_PLIST_BASE64`・`GOOGLE_SERVICE_INFO_PLIST_DEV`・`GOOGLE_SERVICE_INFO_PLIST_PROD` のどれか。`required` が true なら、Upload で Secret が無いと止める（false なら注釈を出して Firebase につながないビルドを作る）
+- Archive の後に、書き出した plist がアプリに入ったか、ほかの構成の plist が入っていないかを確かめる。ほかの構成の plist は、構成ごとの `EXCLUDED_SOURCE_FILE_NAMES` でアプリから外しておく
+- `crashlytics` が true なら、Upload するときに、SPM が取ってきた firebase-ios-sdk の `Crashlytics/upload-symbols` で dSYM を上げる（iOS と macOS。失敗しても Upload は止めない）
+
 ## 呼ぶ側
 
 版は、タグではなくコミット（40 桁）で固定する。同じコミットを `app-kit-ref` にも渡す（再利用ワークフローには、呼ばれた版を知る組み込みの値が無いため）。

@@ -5,6 +5,17 @@
 
 ## Unreleased
 
+## v1.6.0（2026-11-24）
+
+- Archive・Upload のビルドの構成を、ブランチで切り替えられるようにした。`.github/app-kit.json` の `archive.configurations` に、構成の名前・ブランチのパターン・書き出す `GoogleService-Info` の plist を並べる（上から順に見て最初に合ったもの。`branches` を省いた構成はどのブランチにも合う）。今までは `Release` 決め打ちだった
+  - 構成ごとに別の plist を、Secret `GOOGLE_SERVICE_INFO_PLIST_BASE64`・`GOOGLE_SERVICE_INFO_PLIST_DEV`・`GOOGLE_SERVICE_INFO_PLIST_PROD` のどれかから書き出す。`required` が true なら、Upload で Secret が無いと止める
+  - Archive の後に、書き出した plist がアプリに入ったか、ほかの構成の plist が入っていないかを確かめる
+  - 手動の実行（Archive・Upload）に入力 `configuration` を足した（空ならブランチで決める）
+  - `archive.configurations` を書かなければ、今までと同じ（`Release` と `archive.googleServiceInfo`）
+- `archive.crashlytics` が true なら、Upload するときに、書き出した plist で dSYM を Crashlytics に上げるようにした（SPM が取ってきた firebase-ios-sdk の `Crashlytics/upload-symbols`。iOS と macOS）
+- 初めての入れ替えで、審査の提出のワークフロー（`.github/workflows/app-store-submit.yml`・`Tools/submit_for_review.py`）があれば、それが読む `Tools/app_store_config.py`・`app_store_connect.py`・`upload_app_info.py`・`upload_metadata.py` を外さないようにした（`manifest.json` の `keepIfPresent`）
+- 呼ぶ側の Upload・Archive に、入力 `configuration` と Secrets `GOOGLE_SERVICE_INFO_PLIST_DEV`・`_PROD` を足した。版を上げる PR で置き換わるので、呼ぶ側を手で直す必要は無い（minor）
+
 ## v1.4.0（2026-11-23）
 
 - macOS（Mac App Store）の Archive・`.pkg` の書き出し・App Store Connect への Upload を扱うようにした。`.github/app-kit.json` の `archive.platforms` に `macOS` を書く（v1.3.0 までは plan で断っていた）。Secrets は iOS と同じものを使う
