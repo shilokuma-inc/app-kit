@@ -5,6 +5,15 @@
 
 ## Unreleased
 
+## v1.7.0（2026-11-24）
+
+- 撮影で、`AppStore/languages.json` の `assetsFrom`（ほかの言語の画像を流用する言語。`appleLanguage`・`appleLocale` を持たない）を扱うようにした。流用する言語は撮らず、流用元の言語を撮る（流用する言語だけを指定したら流用元を撮る）。v1.6.0 までは、この形の言語があると撮影の計画が `KeyError` で止まっていた（ninjacord-ios の en-GB・es-MX）
+  - 流用元が無い・流用元も流用する言語・流用する言語に `appleLanguage`・`appleLocale` を書いた、のどれかなら、理由を出して止める
+  - App Store Connect の言語と画像の言語の読み替えは、今までどおり司令塔の撮影の設定（`languages`）で行う
+- スタブのフレームワークの署名の直しで、署名の無いフレームワークがあると、`codesign -dv` が 0 以外で終わり、直す前に止まっていたのを直した（識別子は空として、正しい識別子で署名し直す）
+- 呼ぶ側の直しは要らない
+  - 設定の直しが要るのは、同じ言語に `assetsFrom` と `appleLanguage`・`appleLocale` を両方書いていたときだけ（v1.6.0 までは `assetsFrom` を読まず、ふつうの言語として撮っていた）。流用するなら `appleLanguage`・`appleLocale` を消し、撮るなら `assetsFrom` を消す。この形のリポジトリは見つかっていない（ninjacord-ios は書いていない）
+
 ## v1.6.0（2026-11-24）
 
 - Archive・Upload のビルドの構成を、ブランチで切り替えられるようにした。`.github/app-kit.json` の `archive.configurations` に、構成の名前・ブランチのパターン・書き出す `GoogleService-Info` の plist を並べる（上から順に見て最初に合ったもの。`branches` を省いた構成はどのブランチにも合う）。今までは `Release` 決め打ちだった

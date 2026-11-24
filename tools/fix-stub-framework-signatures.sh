@@ -26,7 +26,8 @@ fi
 fixed=0
 for framework in "${frameworks[@]}"; do
   bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$framework/Info.plist")
-  identifier=$(codesign -dv "$framework" 2>&1 | sed -n 's/^Identifier=//p')
+  # 署名の無いフレームワークでは codesign -dv が 0 以外で終わるので、pipefail で止まらないようにする（識別子は空になり、下で署名する）
+  identifier=$({ codesign -dv "$framework" 2>&1 || true; } | sed -n 's/^Identifier=//p')
   if [[ "$identifier" != "$bundle_id" ]]; then
     codesign --force --sign - --identifier "$bundle_id" "$framework"
     echo "${framework#"$app"/}: 署名の識別子を ${identifier:-（署名なし）} から $bundle_id に直しました"
