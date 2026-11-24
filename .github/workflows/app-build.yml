@@ -157,7 +157,10 @@ jobs:
 
       - name: Select simulator
         if: env.APP_KIT_TEST_PLATFORM != 'macOS'
-        run: echo "SIMULATOR_ID=$("$APP_KIT_DIR/tools/select-simulator.sh" "$APP_KIT_TEST_PLATFORM")" >> "$GITHUB_ENV"
+        # echo の中の $(…) は失敗しても echo が成功するので、代入してから書く（選べなければ、ここで止める）
+        run: |
+          simulator_id=$("$APP_KIT_DIR/tools/select-simulator.sh" "$APP_KIT_TEST_PLATFORM")
+          echo "SIMULATOR_ID=$simulator_id" >> "$GITHUB_ENV"
 
       - name: Build and test
         # 先頭のプラットフォームで、そのプラットフォームのスキーム（.github/app-kit.json の schemes。無ければ scheme）のテストを流す。
