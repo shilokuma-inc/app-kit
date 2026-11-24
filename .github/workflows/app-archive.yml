@@ -326,6 +326,41 @@ jobs:
           done
           [[ "$failed" == "false" ]]
 
+      - name: Upload dSYMs to Crashlytics
+        # TestFlight・App Store に上げるビルドの dSYM を Crashlytics に上げ、クラッシュの記録を記号化できるようにする（.github/app-kit.json の archive.crashlytics）。
+        # SPM が取ってきた firebase-ios-sdk の Crashlytics/upload-symbols を、書き出した plist で呼ぶ（Run Script のビルドフェーズは project.pbxproj を変えるので使わない）。
+        # 上げないビルド（手動の Archive）は配らないので上げない。plist・道具・dSYM が無いときと、上げるのに失敗したときは、注釈を出して Upload は止めない
+        if: inputs.export && inputs.upload && env.APP_KIT_CRASHLYTICS == 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          case "$SDK" in
+            iphoneos) platform=ios ;;
+            macosx) platform=mac ;;
+            *) platform="" ;;
+          esac
+          upload_symbols=$(find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 6 -type f \
+            -path '*/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols' 2>/dev/null | head -1)
+          dsyms="$ARCHIVE_PATH/dSYMs"
+          message=""
+          if [[ "${APP_KIT_GOOGLE_SERVICE_INFO_WRITTEN:-}" != "true" ]]; then
+            message="GoogleService-Info の plist を書き出していないので、dSYM を Crashlytics に上げませんでした"
+          elif [[ -z "$platform" ]]; then
+            message="$PLATFORM の dSYM は Crashlytics に上げません（iOS と macOS だけ）"
+          elif [[ -z "$upload_symbols" ]]; then
+            message="firebase-ios-sdk の Crashlytics/upload-symbols が見つからないため、dSYM を Crashlytics に上げませんでした"
+          elif [[ ! -d "$dsyms" ]] || [[ -z "$(ls -A "$dsyms")" ]]; then
+            message="Archive に dSYM が無いため、Crashlytics に上げませんでした"
+          elif ! "$upload_symbols" --google-service-plist "$APP_KIT_GOOGLE_SERVICE_INFO_PATH" --platform "$platform" "$dsyms"; then
+            message="dSYM を Crashlytics に上げられませんでした（クラッシュの記録が記号化されません）"
+          fi
+          if [[ -n "$message" ]]; then
+            echo "::warning::$message"
+            echo "⚠️ $message" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "dSYM を Crashlytics に上げました（構成 $APP_KIT_CONFIGURATION）"
+
       - name: Check Mac App Store requirements
         # App Sandbox と Info.plist の LSApplicationCategoryType が無いと、ビルドも書き出しも通るのに App Store Connect への Upload で断られる。
         # 鍵が要らないので、書き出しの前（export が false のときも）に確かめる
