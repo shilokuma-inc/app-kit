@@ -12,6 +12,11 @@ on:
       - develop
       - 'release/**'
   workflow_dispatch:
+    inputs:
+      configuration:
+        description: Archive するビルドの構成の名前（.github/app-kit.json の archive.configurations のどれか）。空ならブランチで決める
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -30,6 +35,8 @@ jobs:
       # 引用符で囲む（数字と e だけのコミットを、YAML が数として読まないように）
       app-kit-ref: '{{APP_KIT_REF}}'
       upload: true
+      # push のときは空（ブランチで決める）
+      configuration: ${{ inputs.configuration || '' }}
     # 組織をまたぐと secrets: inherit が効かないので、名前を並べて渡す
     secrets:
       EXPORT_OPTIONS: ${{ secrets.EXPORT_OPTIONS }}
@@ -38,3 +45,5 @@ jobs:
       APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
       TESTFLIGHT_INTERNAL_TESTERS: ${{ secrets.TESTFLIGHT_INTERNAL_TESTERS }}
       GOOGLE_SERVICE_INFO_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+      GOOGLE_SERVICE_INFO_PLIST_DEV: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_DEV }}
+      GOOGLE_SERVICE_INFO_PLIST_PROD: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_PROD }}
