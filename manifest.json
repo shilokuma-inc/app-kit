@@ -71,14 +71,18 @@
       "path": "Tools/app_store_config.py",
       "keepIfPresent": [
         "Tools/upload_creative_assets.py",
-        ".github/workflows/app-store-creative-assets.yml"
+        ".github/workflows/app-store-creative-assets.yml",
+        ".github/workflows/app-store-submit.yml",
+        "Tools/submit_for_review.py"
       ]
     },
     {
       "path": "Tools/app_store_connect.py",
       "keepIfPresent": [
         "Tools/upload_creative_assets.py",
-        ".github/workflows/app-store-creative-assets.yml"
+        ".github/workflows/app-store-creative-assets.yml",
+        ".github/workflows/app-store-submit.yml",
+        "Tools/submit_for_review.py"
       ]
     },
     {
@@ -101,13 +105,21 @@
       "path": "Tools/overlay_screenshot.swift"
     },
     {
-      "path": "Tools/upload_metadata.py"
+      "path": "Tools/upload_metadata.py",
+      "keepIfPresent": [
+        ".github/workflows/app-store-submit.yml",
+        "Tools/submit_for_review.py"
+      ]
     },
     {
       "path": "Tools/upload_screenshots.py"
     },
     {
-      "path": "Tools/upload_app_info.py"
+      "path": "Tools/upload_app_info.py",
+      "keepIfPresent": [
+        ".github/workflows/app-store-submit.yml",
+        "Tools/submit_for_review.py"
+      ]
     },
     {
       "path": "scripts/ralph-kit.sh"
