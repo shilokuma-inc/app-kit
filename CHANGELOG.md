@@ -12,6 +12,7 @@
   - Archive の後に、書き出した plist がアプリに入ったか、ほかの構成の plist が入っていないかを確かめる
   - 手動の実行（Archive・Upload）に入力 `configuration` を足した（空ならブランチで決める）
   - `archive.configurations` を書かなければ、今までと同じ（`Release` と `archive.googleServiceInfo`）
+- プラットフォームごとのスキームを扱うようにした。`.github/app-kit.json` の `schemes`（プラットフォーム → スキーム）に `scheme` と違うものだけを書く（kawarin-apple の macOS 版の `KawarinMac` など）。Build のテストは先頭のプラットフォームのスキーム、ほかのプラットフォームのビルドと Archive・Upload は、それぞれのスキームで行う。今までは 1 つの `scheme` だけだった
 - `archive.crashlytics` が true なら、Upload するときに、書き出した plist で dSYM を Crashlytics に上げるようにした（SPM が取ってきた firebase-ios-sdk の `Crashlytics/upload-symbols`。iOS と macOS）
 - 初めての入れ替えで、審査の提出のワークフロー（`.github/workflows/app-store-submit.yml`・`Tools/submit_for_review.py`）があれば、それが読む `Tools/app_store_config.py`・`app_store_connect.py`・`upload_app_info.py`・`upload_metadata.py` を外さないようにした（`manifest.json` の `keepIfPresent`）
 - 配る `.swiftlint.yml` の `excluded` に `**/.build` を足した。ローカルの Swift Package を `swift build` すると、その中の `.build` の生成ファイルまで lint されていた（theater-player-app-vision が足していた除外）

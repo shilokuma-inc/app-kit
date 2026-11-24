@@ -41,6 +41,17 @@ iOS と macOS を出すアプリは `archive.platforms` に両方を書く（プ
 - App Store Connect のアプリに macOS のプラットフォームがまだ無いときは、macOS の Upload だけを飛ばし、追加の手順を Job Summary に出す
 - macOS のスクショ・クリエイティブアセットは扱わない（撮れない表示サイズは撮影の plan が止める）。macOS だけのアプリは、`unmanaged` に `.github/workflows/app-store-screenshots.yml`・`.github/workflows/app-store-creative.yml` を入れる
 
+## プラットフォームごとのスキーム
+
+プラットフォームでスキームが違うアプリ（iOS 版が `Kawarin`、macOS 版が別のターゲットの `KawarinMac` など）は、`schemes` に `scheme` と違うものだけを書く（v1.6.0）。
+
+```json
+{ "project": "Kawarin.xcodeproj", "scheme": "Kawarin", "schemes": { "macOS": "KawarinMac" }, "platforms": ["iOS", "macOS"], "archive": { "platforms": ["iOS", "macOS"] } }
+```
+
+- Build: テストは先頭のプラットフォームのスキームで流す（`uiTests` もそのスキームのもの）。2 つ目からのプラットフォームは、それぞれのスキームでビルドだけを確かめる。パッケージの解決と SwiftLint は `scheme` で行う
+- Archive・Upload: プラットフォームごとのジョブが、そのプラットフォームのスキームで Archive し、entitlements もそのスキームの設定で入れる
+
 ## 構成の切り替えと Firebase
 
 Archive・Upload は、既定では `Release` で作り、`archive.googleServiceInfo` があれば Secret `GOOGLE_SERVICE_INFO_PLIST_BASE64` を書き出す。
