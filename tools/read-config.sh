@@ -11,7 +11,10 @@
 set -euo pipefail
 
 # app-kit の版ごとの既定の Xcode。ランナーの更新でビルドが変わらないよう固定する
-DEFAULT_XCODE_VERSION="26.6"
+DEFAULT_XCODE_VERSION="27.1"
+# Xcode の major ごとの、その Xcode が入ったランナーのラベル。GitHub の macOS の画像は、macos-26 までは macOS の版ごと
+# （macos-26 には Xcode 26.x だけ）、Xcode 27 からは Xcode の major ごと（xcode-27）になった。macos-latest は行き先が変わるので使わない
+RUNNERS='{"26":"macos-26","27":"xcode-27"}'
 
 config="${1:-}"
 if [[ -z "$config" ]]; then
@@ -37,7 +40,7 @@ if [[ "$values" != "1" ]]; then
 fi
 
 # 合わない値の理由を 1 行ずつ出す
-problems=$(jq -r '
+problems=$(jq -r --argjson runners "$RUNNERS" '
   def name_pattern: "^[A-Za-z0-9_][A-Za-z0-9_.+-]*$";
   def path_pattern: "^[A-Za-z0-9_][A-Za-z0-9_.+/-]*$";
   def has_parent: split("/") | any(. == ".." or . == "");
@@ -84,6 +87,8 @@ problems=$(jq -r '
     (if .generate != null and .generate != "xcodegen" then "generate は null か \"xcodegen\" にしてください（\(.generate | tojson)）" else empty end),
     (if .uiTests != null and ((.uiTests | is_name) | not) then "uiTests の形が合いません（\(.uiTests | tojson)）" else empty end),
     (if .xcodeVersion != null and ((.xcodeVersion | type == "string" and test("^[0-9]+(\\.[0-9]+){0,2}$")) | not) then "xcodeVersion の形が合いません（\(.xcodeVersion | tojson)）" else empty end),
+    (if (.xcodeVersion | type == "string" and test("^[0-9]+(\\.[0-9]+){0,2}$")) and $runners[.xcodeVersion | split(".")[0]] == null
+      then "xcodeVersion の Xcode が入ったランナーを、この版の app-kit は知りません（\(.xcodeVersion | tojson)。major が \($runners | keys | join("・")) のどれかにしてください）" else empty end),
     (if .swiftlint != null and (.swiftlint | type != "boolean") then "swiftlint は true か false にしてください（\(.swiftlint | tojson)）" else empty end),
     (if .swiftPackages != null and ((.swiftPackages | type == "array" and all(.[]; is_path) and (unique | length) == length) | not)
       then "swiftPackages はリポジトリの中のパスの並びにしてください（\(.swiftPackages | tojson)）" else empty end),
@@ -120,7 +125,7 @@ if [[ -n "$problems" ]]; then
   exit 1
 fi
 
-jq -r --arg default_xcode "$DEFAULT_XCODE_VERSION" '
+jq -r --arg default_xcode "$DEFAULT_XCODE_VERSION" --argjson runners "$RUNNERS" '
   "APP_KIT_PROJECT=\(.project)",
   "APP_KIT_SCHEME=\(.scheme)",
   # プラットフォームごとのスキーム（schemes に無いプラットフォームは scheme）。テストは先頭のプラットフォームのスキームで流す
@@ -132,6 +137,8 @@ jq -r --arg default_xcode "$DEFAULT_XCODE_VERSION" '
   "APP_KIT_GENERATE=\(.generate // "")",
   "APP_KIT_UI_TESTS=\(.uiTests // "")",
   "APP_KIT_XCODE_VERSION=\(.xcodeVersion // $default_xcode)",
+  # Build・Archive のランナー（Xcode の major で決める。呼ぶ側が runs-on を渡せばそちら）
+  "APP_KIT_RUNS_ON=\($runners[(.xcodeVersion // $default_xcode) | split(".")[0]])",
   "APP_KIT_SWIFTLINT=\(if .swiftlint == false then "false" else "true" end)",
   "APP_KIT_SWIFT_PACKAGES=\((.swiftPackages // []) | join(" "))",
   "APP_KIT_ARCHIVE_PLATFORMS=\((.archive.platforms // [.platforms[0]]) | join(" "))",

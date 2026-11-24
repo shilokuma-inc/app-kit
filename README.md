@@ -19,6 +19,20 @@ AskHub で開発する Apple のアプリのリポジトリに、CI・リリー�
 | `managed/` | 各リポジトリに写すファイル（置き場所と同じ並び）。呼ぶ側のワークフローは版を `{{APP_KIT_REF}}`・`{{APP_KIT_VERSION}}` の目印で持つ |
 | `manifest.json` | 写すファイルの一覧（`managed`）と、初めての入れ替えで外すファイル（`replaces`。`keepIfPresent` のファイルがあれば外さない） |
 
+## Xcode とランナー
+
+Build・Archive・Upload は、既定では Xcode 27.1 で流す（v1.8.0。v1.7.0 までは 26.6）。ランナーは Xcode の major で決まる。
+
+| Xcode | ランナー |
+| --- | --- |
+| 27.x（既定） | `xcode-27`（macOS 27。GitHub の macOS の画像は、Xcode 27 から Xcode の major ごとになった） |
+| 26.x | `macos-26`（Xcode 26.x だけが入っている） |
+
+- 既定と違う Xcode を使うときだけ、`.github/app-kit.json` の `xcodeVersion` に書く。Xcode 27 で落ちるコードを直すまでの間は `"xcodeVersion": "26.6"` にすると、今までどおり `macos-26` の 26.6 で流れる
+  （2027 年 4 月から、App Store Connect は iOS 27 の SDK でビルドしたものしか受け付けない。altool の警告 90725）
+- テストの Simulator は、選んだ Xcode の SDK と同じか古い、最新のランタイムの iPhone（iPhone Duo は除く）か Apple Vision Pro
+- 撮影（`AppStore/screenshots.json` の `runsOn`・`xcodeVersion`）とクリエイティブアセットのランナーは、この既定と別に決まる（撮影の既定は `macos-latest`・26.6）
+
 ## クリエイティブアセット
 
 App Store のプロダクトページのヘッダー（3840x1646）と検索結果の画像（3840x2560）は、`app-store-creative.yml` が書き出す（上げない）。
