@@ -68,7 +68,7 @@
       "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.+-]*$"
     },
     "xcodeVersion": {
-      "description": "app-kit の版の既定と違う Xcode を使うときだけ書く（maxim-lobanov/setup-xcode に渡す）",
+      "description": "app-kit の版の既定（v1.8.0 から 27.1）と違う Xcode を使うときだけ書く（maxim-lobanov/setup-xcode に渡す）。ランナーは major で決まる（27 は xcode-27、26 は macos-26）",
       "type": [
         "string",
         "null"
