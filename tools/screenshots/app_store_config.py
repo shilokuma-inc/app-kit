@@ -132,27 +132,66 @@ def app_value(key: str) -> str:
 # MARK: - languages.json
 
 
-def languages(selected: list[str] | None = None) -> list[Language]:
-    """指定した言語（省略時は全言語）の設定を返す。知らない言語を指定したらその場で止める。"""
-    entries = _read_json(LANGUAGES_FILE)["languages"]
-    known = {entry["language"]: entry for entry in entries}
-    targets = [entry["language"] for entry in entries] if selected is None else selected
+def _shot_language(code: str, raw: dict[str, dict], problems: list[str]) -> Language | None:
+    """言語 code を撮るのに撮る言語の設定を返す（流用する言語は流用元のもの）。設定が合わなければ problems に足して None を返す。
 
-    unknown = [language for language in targets if language not in known]
+    assetsFrom を書いた言語（ninjacord-ios の en-GB など）は撮影せず、流用元の言語の画像を使う。appleLanguage・appleLocale は書かない。
+    App Store Connect の言語と画像の言語の読み替えは、司令塔の撮影の設定（languages）が持つ
+    """
+    entry = raw[code]
+    source = entry.get("assetsFrom")
+    if source is None:
+        base = entry
+    else:
+        base = raw.get(source)
+        if base is None:
+            problems.append(f"{code} の assetsFrom（{source}）が {LANGUAGES_FILE.name} にありません")
+            return None
+        if "assetsFrom" in base:
+            problems.append(f"{code} の assetsFrom（{source}）も流用する言語です。撮影する言語を指定してください")
+            return None
+        # 撮影しない言語に撮影の設定があると、そちらで撮ると読み違えるので書かせない
+        extra = [key for key in ("appleLanguage", "appleLocale") if key in entry]
+        if extra:
+            problems.append(f"{code} は {source} の画像を流用するので {', '.join(extra)} は書かない")
+            return None
+    missing = [key for key in ("appleLanguage", "appleLocale") if key not in base]
+    if missing:
+        problems.append(f"{source or code} に {', '.join(missing)} がありません")
+        return None
+    return Language(
+        language=source or code,
+        apple_language=base["appleLanguage"],
+        apple_locale=base["appleLocale"],
+        store_locale=base["storeLocale"],
+    )
+
+
+def languages(selected: list[str] | None = None) -> list[Language]:
+    """指定した言語（省略時は全言語）を撮るのに撮る言語の設定を返す。知らない言語を指定したらその場で止める。
+
+    ほかの言語の画像を流用する言語（assetsFrom）は、流用元に置き換えて重なりを除く（例: en-GB だけを指定すると en を撮る）。
+    設定を確かめるのは、指定した言語とその流用元だけ（一部の言語を撮り直すときに、撮らない言語の設定で止めない）
+    """
+    entries = _read_json(LANGUAGES_FILE)["languages"]
+    raw = {entry["language"]: entry for entry in entries}
+    targets = list(raw) if selected is None else selected
+
+    unknown = [language for language in targets if language not in raw]
     if unknown:
         raise SystemExit(
             f"{LANGUAGES_FILE.name} に無い言語: {', '.join(unknown)}\n"
-            f"指定できるのは: {', '.join(known)}"
+            f"指定できるのは: {', '.join(raw)}"
         )
-    return [
-        Language(
-            language=language,
-            apple_language=known[language]["appleLanguage"],
-            apple_locale=known[language]["appleLocale"],
-            store_locale=known[language]["storeLocale"],
-        )
-        for language in targets
-    ]
+    problems: list[str] = []
+    result: list[Language] = []
+    for target in targets:
+        language = _shot_language(target, raw, problems)
+        if language is not None and language not in result:
+            result.append(language)
+    if problems:
+        raise SystemExit("\n".join(problems))
+    return result
 
 
 # MARK: - screenshots.json
