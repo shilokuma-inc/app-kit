@@ -29,6 +29,10 @@ jobs:
       - name: Test read-config.sh
         run: bash tools/tests/test-read-config.sh
 
+      - name: Test select-configuration.sh
+        # Archive する構成をブランチと手動の実行の入力から決める道具（read-config.sh の出力をそのまま渡す）
+        run: bash tools/tests/test-select-configuration.sh
+
       - name: Test embed_archive_entitlements.py
         # Archive に entitlements を入れる道具（xcodebuild・codesign は偽物に差し替える）
         run: python3 tools/tests/test_embed_archive_entitlements.py

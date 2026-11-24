@@ -109,7 +109,8 @@ jobs:
         run: echo "SIMULATOR_ID=$("$APP_KIT_DIR/tools/select-simulator.sh" "$APP_KIT_TEST_PLATFORM")" >> "$GITHUB_ENV"
 
       - name: Build and test
-        # 先頭のプラットフォームでテストを流す。UI テストは共有ランナーで起動待ちに失敗することがあるので、失敗したテストだけ 1 回やり直す
+        # 先頭のプラットフォームで、そのプラットフォームのスキーム（.github/app-kit.json の schemes。無ければ scheme）のテストを流す。
+        # UI テストは共有ランナーで起動待ちに失敗することがあるので、失敗したテストだけ 1 回やり直す
         # （-test-iterations は初回を含む回数の上限）。並列テストは Simulator の clone を作って遅くなるので切る
         env:
           UI_TESTS: ${{ inputs.ui-tests }}
@@ -128,7 +129,7 @@ jobs:
           fi
           xcodebuild test \
             -project "$APP_KIT_PROJECT" \
-            -scheme "$APP_KIT_SCHEME" \
+            -scheme "$APP_KIT_TEST_SCHEME" \
             -destination "$destination" \
             -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath "$RUNNER_TEMP/TestResults.xcresult" \
@@ -138,10 +139,11 @@ jobs:
             ${options[@]+"${options[@]}"}
 
       - name: Build for other platforms
-        # 2 つ目からのプラットフォームは、署名なしでビルドだけを確かめる
+        # 2 つ目からのプラットフォームは、そのプラットフォームのスキームで、署名なしでビルドだけを確かめる
         run: |
           for platform in $APP_KIT_PLATFORMS; do
             [[ "$platform" == "$APP_KIT_TEST_PLATFORM" ]] && continue
+            scheme=$(jq -r --arg platform "$platform" '.[$platform]' <<<"$APP_KIT_SCHEMES_JSON")
             case "$platform" in
               iOS) destination="generic/platform=iOS Simulator" ;;
               visionOS)
@@ -151,10 +153,10 @@ jobs:
                 ;;
               macOS) destination="platform=macOS" ;;
             esac
-            echo "::group::$platform"
+            echo "::group::$platform（$scheme）"
             xcodebuild build \
               -project "$APP_KIT_PROJECT" \
-              -scheme "$APP_KIT_SCHEME" \
+              -scheme "$scheme" \
               -destination "$destination" \
               -derivedDataPath "$DERIVED_DATA" \
               CODE_SIGNING_ALLOWED=NO

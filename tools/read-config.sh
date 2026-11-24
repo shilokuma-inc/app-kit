@@ -43,11 +43,42 @@ problems=$(jq -r '
   def has_parent: split("/") | any(. == ".." or . == "");
   def is_name: type == "string" and test(name_pattern);
   def is_path: type == "string" and test(path_pattern) and (has_parent | not);
+  # ブランチのパターン（* だけを特別な文字にする。? や [ は使わせない）
+  def is_branches: type == "array" and length > 0
+    and all(.[]; type == "string" and test("^[A-Za-z0-9_.*][A-Za-z0-9_.*/-]*$") and (has_parent | not));
+  def is_google_service_info_path: is_path and (split("/") | last | test("^GoogleService-Info[A-Za-z0-9_.+-]*\\.plist$"));
+  def google_service_info_secrets: ["GOOGLE_SERVICE_INFO_PLIST_BASE64", "GOOGLE_SERVICE_INFO_PLIST_DEV", "GOOGLE_SERVICE_INFO_PLIST_PROD"];
+  # 構成 1 つの理由（at は理由に出す場所の名前）
+  def configuration_problems($at; $c):
+    if ($c | type != "object") then "\($at) はオブジェクトにしてください（\($c | tojson)）" else
+      (if ($c.name | is_name) | not then "\($at).name の形が合いません（\($c.name | tojson)）" else empty end),
+      (if $c.branches != null and (($c.branches | is_branches) | not)
+        then "\($at).branches は、ブランチのパターン（英数字と _ . - / *）の 1 つ以上の並びにしてください（\($c.branches | tojson)）" else empty end),
+      (if $c.googleServiceInfo == null then empty
+       elif ($c.googleServiceInfo | type != "object") then "\($at).googleServiceInfo はオブジェクトにしてください（\($c.googleServiceInfo | tojson)）"
+       else
+        (if ($c.googleServiceInfo.path | is_google_service_info_path) | not
+          then "\($at).googleServiceInfo.path は、ファイル名が GoogleService-Info で始まる .plist のパスにしてください（\($c.googleServiceInfo.path | tojson)）" else empty end),
+        (if ([$c.googleServiceInfo.secret] | inside(google_service_info_secrets)) | not
+          then "\($at).googleServiceInfo.secret は \(google_service_info_secrets | join("・")) のどれかにしてください（\($c.googleServiceInfo.secret | tojson)）" else empty end),
+        (if $c.googleServiceInfo.required != null and ($c.googleServiceInfo.required | type != "boolean")
+          then "\($at).googleServiceInfo.required は true か false にしてください（\($c.googleServiceInfo.required | tojson)）" else empty end)
+       end)
+    end;
   if type != "object" then "設定がオブジェクトではありません" else
   [
     (if .v != 1 then "v が 1 ではありません（\(.v | tojson)）" else empty end),
     (if (.project | is_path and endswith(".xcodeproj")) | not then "project は .xcodeproj のパスにしてください（\(.project | tojson)）" else empty end),
     (if (.scheme | is_name) | not then "scheme の形が合いません（\(.scheme | tojson)）" else empty end),
+    (if .schemes != null and (.schemes | type != "object")
+      then "schemes はプラットフォームからスキームへのオブジェクトにしてください（\(.schemes | tojson)）" else empty end),
+    (if (.schemes | type == "object") then
+      ([.platforms, .archive.platforms] | map(if type == "array" then .[] else empty end)) as $platforms
+      | .schemes | to_entries[]
+      | (if ([.key] | inside($platforms)) | not
+          then "schemes の \(.key | tojson) は platforms・archive.platforms にあるプラットフォームにしてください" else empty end),
+        (if (.value | is_name) | not then "schemes の \(.key) のスキームの形が合いません（\(.value | tojson)）" else empty end)
+     else empty end),
     (if (.platforms | type == "array" and length > 0 and all(.[]; . == "iOS" or . == "macOS" or . == "visionOS") and (unique | length) == length) | not
       then "platforms は iOS・macOS・visionOS のうち 1 つ以上の重ならない並びにしてください（\(.platforms | tojson)）" else empty end),
     (if .generate != null and .generate != "xcodegen" then "generate は null か \"xcodegen\" にしてください（\(.generate | tojson)）" else empty end),
@@ -62,7 +93,24 @@ problems=$(jq -r '
       then "archive.platforms は iOS・macOS・visionOS のうち 1 つ以上の重ならない並びにしてください（\(.archive.platforms | tojson)）" else empty end),
     (if (.archive | type == "object") and .archive.googleServiceInfo != null
         and ((.archive.googleServiceInfo | is_path and endswith("/GoogleService-Info.plist")) | not)
-      then "archive.googleServiceInfo は、アプリのフォルダの中の GoogleService-Info.plist のパスにしてください（\(.archive.googleServiceInfo | tojson)）" else empty end)
+      then "archive.googleServiceInfo は、アプリのフォルダの中の GoogleService-Info.plist のパスにしてください（\(.archive.googleServiceInfo | tojson)）" else empty end),
+    (if (.archive | type == "object") and .archive.crashlytics != null and (.archive.crashlytics | type != "boolean")
+      then "archive.crashlytics は true か false にしてください（\(.archive.crashlytics | tojson)）" else empty end),
+    (if (.archive | type == "object") and .archive.configurations != null then
+      .archive as $archive
+      | if ($archive.configurations | type != "array" or length == 0)
+        then "archive.configurations は 1 つ以上の構成の並びにしてください（\($archive.configurations | tojson)）"
+        else
+          (if $archive.googleServiceInfo != null
+            then "archive.configurations と archive.googleServiceInfo は両方は書けません（構成ごとの googleServiceInfo に書いてください）" else empty end),
+          (if ([$archive.configurations[] | objects | .name] | (unique | length) != length) then "archive.configurations の name が重なっています" else empty end),
+          (if ([$archive.configurations[] | objects | select(.branches == null)] | length) > 1
+            then "archive.configurations で branches を省けるのは 1 つだけです" else empty end),
+          (if ($archive.configurations[:-1] | any(type == "object" and .branches == null))
+            then "archive.configurations の branches を省いた構成は、最後に置いてください（どのブランチにも合うため）" else empty end),
+          ($archive.configurations | to_entries[] | configuration_problems("archive.configurations[\(.key)]"; .value))
+        end
+     else empty end)
   ] | .[] end
 ' "$config")
 if [[ -n "$problems" ]]; then
@@ -75,6 +123,10 @@ fi
 jq -r --arg default_xcode "$DEFAULT_XCODE_VERSION" '
   "APP_KIT_PROJECT=\(.project)",
   "APP_KIT_SCHEME=\(.scheme)",
+  # プラットフォームごとのスキーム（schemes に無いプラットフォームは scheme）。テストは先頭のプラットフォームのスキームで流す
+  "APP_KIT_SCHEMES_JSON=\(.scheme as $scheme | (.schemes // {}) as $schemes
+    | [.platforms[], (.archive.platforms // [])[]] | unique | map({key: ., value: ($schemes[.] // $scheme)}) | from_entries | tojson)",
+  "APP_KIT_TEST_SCHEME=\((.schemes // {})[.platforms[0]] // .scheme)",
   "APP_KIT_PLATFORMS=\(.platforms | join(" "))",
   "APP_KIT_TEST_PLATFORM=\(.platforms[0])",
   "APP_KIT_GENERATE=\(.generate // "")",
@@ -84,5 +136,20 @@ jq -r --arg default_xcode "$DEFAULT_XCODE_VERSION" '
   "APP_KIT_SWIFT_PACKAGES=\((.swiftPackages // []) | join(" "))",
   "APP_KIT_ARCHIVE_PLATFORMS=\((.archive.platforms // [.platforms[0]]) | join(" "))",
   "APP_KIT_ARCHIVE_PLATFORMS_JSON=\((.archive.platforms // [.platforms[0]]) | tojson)",
-  "APP_KIT_GOOGLE_SERVICE_INFO=\(.archive.googleServiceInfo // "")"
+  "APP_KIT_GOOGLE_SERVICE_INFO=\(.archive.googleServiceInfo // "")",
+  "APP_KIT_CRASHLYTICS=\(if .archive.crashlytics == true then "true" else "false" end)",
+  # 構成の並び（tools/select-configuration.sh が読む）。configurations が無ければ、今までと同じ Release と archive.googleServiceInfo
+  "APP_KIT_ARCHIVE_CONFIGURATIONS_JSON=\(
+    if .archive.configurations != null then
+      [.archive.configurations[] | {
+        name,
+        branches: (.branches // null),
+        googleServiceInfo: (if .googleServiceInfo == null then null
+          else {path: .googleServiceInfo.path, secret: .googleServiceInfo.secret, required: (.googleServiceInfo.required // false)} end)
+      }]
+    else
+      [{name: "Release", branches: null,
+        googleServiceInfo: (if .archive.googleServiceInfo == null then null
+          else {path: .archive.googleServiceInfo, secret: "GOOGLE_SERVICE_INFO_PLIST_BASE64", required: false} end)}]
+    end | tojson)"
 ' "$config"

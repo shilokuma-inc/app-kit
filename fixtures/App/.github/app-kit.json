@@ -2,6 +2,7 @@
   "v": 1,
   "project": "FixtureApp.xcodeproj",
   "scheme": "FixtureApp",
+  "schemes": { "iOS": "FixtureApp" },
   "platforms": ["iOS"],
   "uiTests": "FixtureAppUITests"
 }

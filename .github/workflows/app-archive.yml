@@ -31,6 +31,10 @@ on:
         description: Archive のランナーのラベル
         type: string
         default: macos-latest
+      configuration:
+        description: Archive するビルドの構成の名前（.github/app-kit.json の archive.configurations のどれか）。空ならブランチで決める
+        type: string
+        default: ''
     secrets:
       EXPORT_OPTIONS:
         description: ExportOptions.plist の内容（destination と、Upload のときの manageAppVersionAndBuildNumber はワークフローが上書きする）
@@ -48,7 +52,13 @@ on:
         description: TestFlight の内部テスターにする人のメールアドレス（カンマ区切り。無ければ内部テスターの設定を省く）
         required: false
       GOOGLE_SERVICE_INFO_PLIST_BASE64:
-        description: GoogleService-Info.plist を base64 にしたもの（.github/app-kit.json の archive.googleServiceInfo のリポジトリだけ）
+        description: GoogleService-Info.plist を base64 にしたもの（.github/app-kit.json の archive.googleServiceInfo か、構成の googleServiceInfo.secret で選んだリポジトリだけ）
+        required: false
+      GOOGLE_SERVICE_INFO_PLIST_DEV:
+        description: 構成ごとに Firebase のプロジェクトを分けるリポジトリの、dev の GoogleService-Info.plist を base64 にしたもの（構成の googleServiceInfo.secret で選ぶ）
+        required: false
+      GOOGLE_SERVICE_INFO_PLIST_PROD:
+        description: 構成ごとに Firebase のプロジェクトを分けるリポジトリの、prod の GoogleService-Info.plist を base64 にしたもの（構成の googleServiceInfo.secret で選ぶ）
         required: false
 
 permissions:
@@ -135,6 +145,9 @@ jobs:
           "$APP_KIT_DIR/tools/read-config.sh" .github/app-kit.json > "$RUNNER_TEMP/app-kit.env"
           cat "$RUNNER_TEMP/app-kit.env" >> "$GITHUB_ENV"
           echo "xcode-version=$(sed -n 's/^APP_KIT_XCODE_VERSION=//p' "$RUNNER_TEMP/app-kit.env")" >> "$GITHUB_OUTPUT"
+          # このプラットフォームのスキーム（.github/app-kit.json の schemes。無ければ scheme）で Archive する
+          schemes=$(sed -n 's/^APP_KIT_SCHEMES_JSON=//p' "$RUNNER_TEMP/app-kit.env")
+          echo "APP_KIT_ARCHIVE_SCHEME=$(jq -r --arg platform "$PLATFORM" '.[$platform]' <<<"$schemes")" >> "$GITHUB_ENV"
           case "$PLATFORM" in
             iOS) sdk=iphoneos ;;
             visionOS) sdk=xros ;;
@@ -156,6 +169,19 @@ jobs:
             echo "API_KEY_PATH=$RUNNER_TEMP/private_keys/AuthKey_$APPLE_API_KEY_ID.p8"
             echo "ENTITLEMENTS_DIR=$RUNNER_TEMP/entitlements"
           } >> "$GITHUB_ENV"
+
+      - name: Choose configuration
+        # Archive するビルドの構成を、.github/app-kit.json の archive.configurations とブランチ（手動の実行で名前を選んだらそれ）から決める。
+        # archive.configurations が無ければ、今までと同じ Release と archive.googleServiceInfo
+        env:
+          BRANCH: ${{ github.ref_name }}
+          REQUESTED: ${{ inputs.configuration }}
+        run: |
+          "$APP_KIT_DIR/tools/select-configuration.sh" "$BRANCH" "$REQUESTED" > "$RUNNER_TEMP/configuration.env"
+          cat "$RUNNER_TEMP/configuration.env"
+          cat "$RUNNER_TEMP/configuration.env" >> "$GITHUB_ENV"
+          configuration=$(sed -n 's/^APP_KIT_CONFIGURATION=//p' "$RUNNER_TEMP/configuration.env")
+          echo "構成 \`$configuration\` で Archive します（ブランチ \`$BRANCH\`）" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check secrets
         # 書き出しには App Store Connect の API キーと ExportOptions.plist が要る。足りなければ、どの Secret かを出して止める（値は出さない）
@@ -199,19 +225,41 @@ jobs:
           xcodebuild -showsdks | grep -q xros || xcodebuild -downloadPlatform visionOS
 
       - name: Create GoogleService-Info.plist
-        # GoogleService-Info.plist はリポジトリに入れない。Secret があれば書き出してアプリに入れる。
-        # 無いときは Firebase につながないビルドになるので、止めずに注釈で知らせる
-        if: env.APP_KIT_GOOGLE_SERVICE_INFO != ''
+        # GoogleService-Info.plist はリポジトリに入れない。この構成の Secret があれば書き出してアプリに入れる。
+        # 無いときは Firebase につながないビルドになるので、注釈で知らせる。構成の googleServiceInfo.required が true なら、Upload では止める
+        # （Firebase に繋がらないビルドを App Store 用に上げない）。Secrets はシェル展開ではなく env で渡し、中身はログに出さない
+        if: env.APP_KIT_GOOGLE_SERVICE_INFO_PATH != ''
         env:
           GOOGLE_SERVICE_INFO_PLIST_BASE64: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_BASE64 }}
+          GOOGLE_SERVICE_INFO_PLIST_DEV: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_DEV }}
+          GOOGLE_SERVICE_INFO_PLIST_PROD: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST_PROD }}
+          UPLOAD: ${{ inputs.export && inputs.upload }}
         run: |
-          if [[ -z "$GOOGLE_SERVICE_INFO_PLIST_BASE64" ]]; then
-            echo "::warning::Secret GOOGLE_SERVICE_INFO_PLIST_BASE64 が無いため、Firebase につながないビルドになります"
-            echo "⚠️ Secret \`GOOGLE_SERVICE_INFO_PLIST_BASE64\` が無いため、Firebase につながないビルドです" >> "$GITHUB_STEP_SUMMARY"
+          case "$APP_KIT_GOOGLE_SERVICE_INFO_SECRET" in
+            GOOGLE_SERVICE_INFO_PLIST_BASE64) encoded=$GOOGLE_SERVICE_INFO_PLIST_BASE64 ;;
+            GOOGLE_SERVICE_INFO_PLIST_DEV) encoded=$GOOGLE_SERVICE_INFO_PLIST_DEV ;;
+            GOOGLE_SERVICE_INFO_PLIST_PROD) encoded=$GOOGLE_SERVICE_INFO_PLIST_PROD ;;
+            *) echo "::error::読めない Secret の名前です: $APP_KIT_GOOGLE_SERVICE_INFO_SECRET"; exit 1 ;;
+          esac
+          if [[ -z "$encoded" ]]; then
+            message="Secret $APP_KIT_GOOGLE_SERVICE_INFO_SECRET が無いため、構成 $APP_KIT_CONFIGURATION は Firebase につながないビルドになります"
+            if [[ "$APP_KIT_GOOGLE_SERVICE_INFO_REQUIRED" == "true" && "$UPLOAD" == "true" ]]; then
+              echo "::error::${message}。この構成は plist が要る（googleServiceInfo.required）ので、上げません"
+              exit 1
+            fi
+            echo "::warning::$message"
+            echo "⚠️ $message" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 --decode > "$APP_KIT_GOOGLE_SERVICE_INFO"
-          plutil -lint "$APP_KIT_GOOGLE_SERVICE_INFO"
+          mkdir -p "$(dirname "$APP_KIT_GOOGLE_SERVICE_INFO_PATH")"
+          if ! printf '%s' "$encoded" | base64 --decode > "$APP_KIT_GOOGLE_SERVICE_INFO_PATH" 2>/dev/null \
+            || ! plutil -lint -s "$APP_KIT_GOOGLE_SERVICE_INFO_PATH" >/dev/null 2>&1; then
+            rm -f "$APP_KIT_GOOGLE_SERVICE_INFO_PATH"
+            echo "::error::Secret $APP_KIT_GOOGLE_SERVICE_INFO_SECRET を plist として読めません。GoogleService-Info.plist を base64 にした値を登録してください"
+            exit 1
+          fi
+          echo "APP_KIT_GOOGLE_SERVICE_INFO_WRITTEN=true" >> "$GITHUB_ENV"
+          echo "$APP_KIT_GOOGLE_SERVICE_INFO_PATH を書き出しました"
 
       - name: Archive
         # 本番の署名は Export がする。iOS・visionOS は署名せずに Archive する（アドホック署名は、push などの entitlement が
@@ -222,9 +270,9 @@ jobs:
           if [[ "$SDK" == "macosx" ]]; then
             xcodebuild archive \
               -project "$APP_KIT_PROJECT" \
-              -scheme "$APP_KIT_SCHEME" \
+              -scheme "$APP_KIT_ARCHIVE_SCHEME" \
               -destination 'generic/platform=macOS' \
-              -configuration Release \
+              -configuration "$APP_KIT_CONFIGURATION" \
               -archivePath "$ARCHIVE_PATH" \
               CODE_SIGN_IDENTITY=- \
               CODE_SIGN_STYLE=Manual \
@@ -232,9 +280,9 @@ jobs:
           else
             xcodebuild archive \
               -project "$APP_KIT_PROJECT" \
-              -scheme "$APP_KIT_SCHEME" \
+              -scheme "$APP_KIT_ARCHIVE_SCHEME" \
               -sdk "$SDK" \
-              -configuration Release \
+              -configuration "$APP_KIT_CONFIGURATION" \
               -archivePath "$ARCHIVE_PATH" \
               CODE_SIGNING_ALLOWED=NO
           fi
@@ -259,10 +307,74 @@ jobs:
         run: |
           python3 "$APP_KIT_DIR/tools/embed_archive_entitlements.py" embed "$ARCHIVE_PATH" \
             --project "$APP_KIT_PROJECT" \
-            --scheme "$APP_KIT_SCHEME" \
+            --scheme "$APP_KIT_ARCHIVE_SCHEME" \
             --sdk "$SDK" \
-            --configuration Release \
+            --configuration "$APP_KIT_CONFIGURATION" \
             --record "$ENTITLEMENTS_DIR/archive.json"
+
+      - name: Check GoogleService-Info.plist in the app
+        # 書き出した plist がアプリに入ったか、ほかの構成の plist が入っていないかを確かめる
+        # （取り違えて、本番のアプリが dev の Firebase に繋がったり、どこにも繋がらなかったりしないように）
+        if: env.APP_KIT_GOOGLE_SERVICE_INFO_PATH != '' || env.APP_KIT_GOOGLE_SERVICE_INFO_OTHERS != ''
+        run: |
+          app_path=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:ApplicationPath' "$ARCHIVE_PATH/Info.plist")
+          resources="$ARCHIVE_PATH/Products/$app_path"
+          if [[ "$SDK" == "macosx" ]]; then
+            resources="$resources/Contents/Resources"
+          fi
+          failed=false
+          if [[ "${APP_KIT_GOOGLE_SERVICE_INFO_WRITTEN:-}" == "true" ]]; then
+            name=$(basename "$APP_KIT_GOOGLE_SERVICE_INFO_PATH")
+            if [[ -f "$resources/$name" ]]; then
+              echo "$name がアプリに入っています"
+            else
+              echo "::error::書き出した $name がアプリに入っていません（ターゲットのリソースに入る場所か、構成 $APP_KIT_CONFIGURATION の EXCLUDED_SOURCE_FILE_NAMES を確かめてください）"
+              failed=true
+            fi
+          fi
+          read -ra others <<<"$APP_KIT_GOOGLE_SERVICE_INFO_OTHERS"
+          for name in "${others[@]}"; do
+            if [[ -e "$resources/$name" ]]; then
+              echo "::error::構成 $APP_KIT_CONFIGURATION のアプリに、ほかの構成の $name が入っています"
+              failed=true
+            fi
+          done
+          [[ "$failed" == "false" ]]
+
+      - name: Upload dSYMs to Crashlytics
+        # TestFlight・App Store に上げるビルドの dSYM を Crashlytics に上げ、クラッシュの記録を記号化できるようにする（.github/app-kit.json の archive.crashlytics）。
+        # SPM が取ってきた firebase-ios-sdk の Crashlytics/upload-symbols を、書き出した plist で呼ぶ（Run Script のビルドフェーズは project.pbxproj を変えるので使わない）。
+        # 上げないビルド（手動の Archive）は配らないので上げない。plist・道具・dSYM が無いときと、上げるのに失敗したときは、注釈を出して Upload は止めない
+        if: inputs.export && inputs.upload && env.APP_KIT_CRASHLYTICS == 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          case "$SDK" in
+            iphoneos) platform=ios ;;
+            macosx) platform=mac ;;
+            *) platform="" ;;
+          esac
+          upload_symbols=$(find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 6 -type f \
+            -path '*/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols' 2>/dev/null | head -1)
+          dsyms="$ARCHIVE_PATH/dSYMs"
+          message=""
+          if [[ "${APP_KIT_GOOGLE_SERVICE_INFO_WRITTEN:-}" != "true" ]]; then
+            message="GoogleService-Info の plist を書き出していないので、dSYM を Crashlytics に上げませんでした"
+          elif [[ -z "$platform" ]]; then
+            message="$PLATFORM の dSYM は Crashlytics に上げません（iOS と macOS だけ）"
+          elif [[ -z "$upload_symbols" ]]; then
+            message="firebase-ios-sdk の Crashlytics/upload-symbols が見つからないため、dSYM を Crashlytics に上げませんでした"
+          elif [[ ! -d "$dsyms" ]] || [[ -z "$(ls -A "$dsyms")" ]]; then
+            message="Archive に dSYM が無いため、Crashlytics に上げませんでした"
+          elif ! "$upload_symbols" --google-service-plist "$APP_KIT_GOOGLE_SERVICE_INFO_PATH" --platform "$platform" "$dsyms"; then
+            message="dSYM を Crashlytics に上げられませんでした（クラッシュの記録が記号化されません）"
+          fi
+          if [[ -n "$message" ]]; then
+            echo "::warning::$message"
+            echo "⚠️ $message" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "dSYM を Crashlytics に上げました（構成 $APP_KIT_CONFIGURATION）"
 
       - name: Check Mac App Store requirements
         # App Sandbox と Info.plist の LSApplicationCategoryType が無いと、ビルドも書き出しも通るのに App Store Connect への Upload で断られる。
